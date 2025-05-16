@@ -58,16 +58,14 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 5;
-  const INITIAL_RETRY_DELAY = 1000; // 1 second
+  const INITIAL_RETRY_DELAY = 1000;
   const socketRef = useRef(null);
 
   const connectWebSocket = useCallback(() => {
-    // Close existing socket if it exists
     if (socketRef.current) {
       socketRef.current.close();
     }
 
-    // WebSocket URL based on environment
     const WEBSOCKET_URL =
       process.env.NODE_ENV === "production"
         ? "wss://play-machine-server.noshado.ws/"
@@ -75,14 +73,13 @@ function App() {
 
     console.log(`Using WebSocket URL: ${WEBSOCKET_URL}`);
 
-    // Initialize WebSocket connection
     const ws = new WebSocket(WEBSOCKET_URL);
     socketRef.current = ws;
 
     ws.onopen = () => {
       console.log("Connected to WebSocket server");
       setConnected(true);
-      setRetryCount(0); // Reset retry count on successful connection
+      setRetryCount(0);
       setSocket(ws);
     };
 
@@ -110,7 +107,6 @@ function App() {
       setLoading(false);
       setSocket(null);
 
-      // Only attempt reconnection if this is still the current socket
       if (socketRef.current === ws && retryCount < MAX_RETRIES) {
         const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
         console.log(
@@ -129,7 +125,7 @@ function App() {
         );
       }
     };
-  }, [retryCount, MAX_RETRIES, INITIAL_RETRY_DELAY]); // Removed socket from dependencies
+  }, [retryCount, MAX_RETRIES, INITIAL_RETRY_DELAY]);
 
   useEffect(() => {
     connectWebSocket();
