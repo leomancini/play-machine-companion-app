@@ -51,15 +51,36 @@ const DataDisplay = styled.div`
   font-size: 16px;
 `;
 
+const HistoryList = styled.div`
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  li {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+`;
+
 function App() {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [serialData, setSerialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [dataHistory, setDataHistory] = useState([]);
   const MAX_RETRIES = 5;
   const INITIAL_RETRY_DELAY = 1000;
   const socketRef = useRef(null);
+
+  useEffect(() => {
+    // Load existing data from localStorage on mount
+    const savedData = localStorage.getItem("serialDataHistory");
+    if (savedData) {
+      setDataHistory(JSON.parse(savedData));
+    }
+  }, []);
 
   const connectWebSocket = useCallback(() => {
     if (socketRef.current) {
@@ -88,6 +109,19 @@ function App() {
       try {
         const data = JSON.parse(event.data);
         setSerialData(data);
+        // Add new data to history with timestamp
+        const newEntry = {
+          data,
+          timestamp: new Date().toISOString()
+        };
+        setDataHistory((prevHistory) => {
+          const updatedHistory = [newEntry, ...prevHistory].slice(0, 10); // Keep last 10 entries
+          localStorage.setItem(
+            "serialDataHistory",
+            JSON.stringify(updatedHistory)
+          );
+          return updatedHistory;
+        });
         setLoading(false);
       } catch (error) {
         console.error("Failed to parse message data:", error);
@@ -159,11 +193,18 @@ function App() {
         {loading ? "Loading..." : "Request Current Serial Data"}
       </RequestButton>
 
-      {serialData && (
-        <DataDisplay>
-          <h3>Serial Data:</h3>
-          <pre>{JSON.stringify(serialData, null, 2)}</pre>
-        </DataDisplay>
+      {dataHistory.length > 0 && (
+        <HistoryList>
+          <h3>History:</h3>
+          <ul>
+            {dataHistory.map((entry, index) => (
+              <li key={entry.timestamp}>
+                {new Date(entry.timestamp).toLocaleString()}:{" "}
+                {JSON.stringify(entry.data)}
+              </li>
+            ))}
+          </ul>
+        </HistoryList>
       )}
     </Page>
   );
