@@ -4,11 +4,32 @@ import styled from "styled-components";
 const Page = styled.div`
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 100vh;
   font-size: 24px;
   color: #333;
+  padding: 20px;
+  overflow-y: auto;
+  box-sizing: border-box;
+`;
+
+const ContentWrapper = styled.div`
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 0;
+`;
+
+const Card = styled.div`
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  width: 100%;
+  max-width: 800px;
+  margin-top: 20px;
 `;
 
 const StatusIndicator = styled.div`
@@ -28,7 +49,7 @@ const RequestButton = styled.button`
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  margin-bottom: 20px;
+  width: 100%;
 
   &:hover {
     background-color: #0052a3;
@@ -55,27 +76,10 @@ const ClearHistoryButton = styled.button`
   }
 `;
 
-const ResendButton = styled.button`
-  padding: 4px 8px;
-  font-size: 12px;
-  background-color: #28a745;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-left: 10px;
-
-  &:hover {
-    background-color: #218838;
-  }
-
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-`;
-
 const HistoryList = styled.div`
+  width: 100%;
+  max-width: 800px;
+
   ul {
     list-style: none;
     padding: 0;
@@ -84,6 +88,43 @@ const HistoryList = styled.div`
   li {
     width: 100%;
     margin-bottom: 1rem;
+  }
+`;
+
+const HistoryItem = styled.div`
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const HistoryHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+`;
+
+const ResendButton = styled.button`
+  padding: 12px 24px;
+  font-size: 18px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+
+  &:hover {
+    background-color: #218838;
+  }
+
+  &:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
   }
 `;
 
@@ -209,53 +250,47 @@ function App() {
 
   return (
     <Page>
-      <StatusIndicator $connected={connected}>
-        {connected ? "Connected" : "Disconnected"}
-      </StatusIndicator>
+      <ContentWrapper>
+        <StatusIndicator $connected={connected}>
+          {connected ? "Connected" : "Disconnected"}
+        </StatusIndicator>
 
-      <RequestButton
-        onClick={requestSerialData}
-        disabled={!connected || loading}
-      >
-        {loading ? "Loading..." : "Request Current Serial Data"}
-      </RequestButton>
+        <RequestButton
+          onClick={requestSerialData}
+          disabled={!connected || loading}
+        >
+          {loading ? "Loading..." : "Request Current Serial Data"}
+        </RequestButton>
 
-      {dataHistory.length > 0 && (
-        <HistoryList>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "10px"
-            }}
-          >
-            <h3 style={{ margin: 0 }}>History:</h3>
-            <ClearHistoryButton onClick={clearHistory}>
-              Clear History
-            </ClearHistoryButton>
-          </div>
-          <ul>
-            {dataHistory.map((entry, index) => (
-              <li
-                key={entry.timestamp}
-                style={{ display: "flex", alignItems: "center", gap: "10px" }}
-              >
-                <span>
-                  {new Date(entry.timestamp).toLocaleString()}:{" "}
-                  {JSON.stringify(entry.data)}
-                </span>
-                <ResendButton
-                  onClick={() => resendSerialData(entry.data)}
-                  disabled={!connected}
-                >
-                  Resend
-                </ResendButton>
-              </li>
-            ))}
-          </ul>
-        </HistoryList>
-      )}
+        {dataHistory.length > 0 && (
+          <HistoryList>
+            <HistoryHeader>
+              <h3 style={{ margin: 0 }}>History:</h3>
+              <ClearHistoryButton onClick={clearHistory}>
+                Clear History
+              </ClearHistoryButton>
+            </HistoryHeader>
+            <ul>
+              {dataHistory.map((entry, index) => (
+                <li key={entry.timestamp}>
+                  <HistoryItem>
+                    <div>
+                      {new Date(entry.timestamp).toLocaleString()}:{" "}
+                      {JSON.stringify(entry.data)}
+                    </div>
+                    <ResendButton
+                      onClick={() => resendSerialData(entry.data)}
+                      disabled={!connected}
+                    >
+                      Send
+                    </ResendButton>
+                  </HistoryItem>
+                </li>
+              ))}
+            </ul>
+          </HistoryList>
+        )}
+      </ContentWrapper>
     </Page>
   );
 }
