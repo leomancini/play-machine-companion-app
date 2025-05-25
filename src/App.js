@@ -16,7 +16,7 @@ const StatusIndicator = styled.div`
   border-radius: 4px;
   font-size: 14px;
   margin-bottom: 20px;
-  background-color: ${(props) => (props.connected ? "#4CAF50" : "#F44336")};
+  background-color: ${(props) => (props.$connected ? "#4CAF50" : "#F44336")};
   color: white;
 `;
 
@@ -40,15 +40,39 @@ const RequestButton = styled.button`
   }
 `;
 
-const DataDisplay = styled.div`
-  border: 1px solid #ccc;
-  padding: 20px;
-  width: 80%;
-  max-width: 600px;
-  border-radius: 8px;
-  background-color: #f9f9f9;
-  margin-top: 20px;
-  font-size: 16px;
+const ClearHistoryButton = styled.button`
+  padding: 8px 16px;
+  font-size: 14px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 20px;
+
+  &:hover {
+    background-color: #c82333;
+  }
+`;
+
+const ResendButton = styled.button`
+  padding: 4px 8px;
+  font-size: 12px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 10px;
+
+  &:hover {
+    background-color: #218838;
+  }
+
+  &:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
 `;
 
 const HistoryList = styled.div`
@@ -66,7 +90,7 @@ const HistoryList = styled.div`
 function App() {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
-  const [serialData, setSerialData] = useState(null);
+  const [, setSerialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [dataHistory, setDataHistory] = useState([]);
@@ -92,36 +116,34 @@ function App() {
         ? "wss://play-machine-server.noshado.ws/"
         : "ws://localhost:3103";
 
-    console.log(`Using WebSocket URL: ${WEBSOCKET_URL}`);
-
     const ws = new WebSocket(WEBSOCKET_URL);
     socketRef.current = ws;
 
     ws.onopen = () => {
-      console.log("Connected to WebSocket server");
       setConnected(true);
       setRetryCount(0);
       setSocket(ws);
     };
 
     ws.onmessage = (event) => {
-      console.log("Message received:", event.data);
       try {
         const data = JSON.parse(event.data);
         setSerialData(data);
-        // Add new data to history with timestamp
-        const newEntry = {
-          data,
-          timestamp: new Date().toISOString()
-        };
-        setDataHistory((prevHistory) => {
-          const updatedHistory = [newEntry, ...prevHistory].slice(0, 10); // Keep last 10 entries
-          localStorage.setItem(
-            "serialDataHistory",
-            JSON.stringify(updatedHistory)
-          );
-          return updatedHistory;
-        });
+        // Add to history if it's a server response or serialData response
+        if (!data.action || data.action === "serialData") {
+          const newEntry = {
+            data,
+            timestamp: new Date().toISOString()
+          };
+          setDataHistory((prevHistory) => {
+            const updatedHistory = [newEntry, ...prevHistory].slice(0, 10); // Keep last 10 entries
+            localStorage.setItem(
+              "serialDataHistory",
+              JSON.stringify(updatedHistory)
+            );
+            return updatedHistory;
+          });
+        }
         setLoading(false);
       } catch (error) {
         console.error("Failed to parse message data:", error);
@@ -136,18 +158,12 @@ function App() {
     };
 
     ws.onclose = () => {
-      console.log("Disconnected from WebSocket server");
       setConnected(false);
       setLoading(false);
       setSocket(null);
 
       if (socketRef.current === ws && retryCount < MAX_RETRIES) {
         const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
-        console.log(
-          `Connection lost. Retrying in ${delay / 1000} seconds... (Attempt ${
-            retryCount + 1
-          }/${MAX_RETRIES})`
-        );
 
         setTimeout(() => {
           setRetryCount((prevCount) => prevCount + 1);
@@ -180,9 +196,20 @@ function App() {
     }
   };
 
+  const clearHistory = () => {
+    setDataHistory([]);
+    localStorage.removeItem("serialDataHistory");
+  };
+
+  const resendSerialData = (data) => {
+    if (socket && connected) {
+      socket.send(JSON.stringify({ action: "setSerialData", data }));
+    }
+  };
+
   return (
     <Page>
-      <StatusIndicator connected={connected}>
+      <StatusIndicator $connected={connected}>
         {connected ? "Connected" : "Disconnected"}
       </StatusIndicator>
 
@@ -195,12 +222,35 @@ function App() {
 
       {dataHistory.length > 0 && (
         <HistoryList>
-          <h3>History:</h3>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "10px"
+            }}
+          >
+            <h3 style={{ margin: 0 }}>History:</h3>
+            <ClearHistoryButton onClick={clearHistory}>
+              Clear History
+            </ClearHistoryButton>
+          </div>
           <ul>
             {dataHistory.map((entry, index) => (
-              <li key={entry.timestamp}>
-                {new Date(entry.timestamp).toLocaleString()}:{" "}
-                {JSON.stringify(entry.data)}
+              <li
+                key={entry.timestamp}
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+              >
+                <span>
+                  {new Date(entry.timestamp).toLocaleString()}:{" "}
+                  {JSON.stringify(entry.data)}
+                </span>
+                <ResendButton
+                  onClick={() => resendSerialData(entry.data)}
+                  disabled={!connected}
+                >
+                  Resend
+                </ResendButton>
               </li>
             ))}
           </ul>
