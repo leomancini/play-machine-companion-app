@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo
+} from "react";
 import styled from "styled-components";
 
 const Page = styled.div`
@@ -20,16 +26,6 @@ const ContentWrapper = styled.div`
   flex-direction: column;
   gap: 20px;
   padding: 20px 0;
-`;
-
-const Card = styled.div`
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-  width: 100%;
-  max-width: 800px;
-  margin-top: 20px;
 `;
 
 const StatusIndicator = styled.div`
@@ -101,6 +97,37 @@ const HistoryItem = styled.div`
   gap: 10px;
 `;
 
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 5px 0;
+`;
+
+const ProgressFill = styled.div`
+  height: 100%;
+  background-color: #0066cc;
+  width: ${(props) => (props.$progress / 5) * 100}%;
+  transition: width 0.3s ease;
+`;
+
+const AutoplayContainer = styled.div`
+  position: relative;
+  width: 100%;
+  margin: 10px 0;
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+`;
+
+const AutoplayImage = styled.img`
+  width: 100%;
+  height: auto;
+  display: ${(props) => (props.$isVisible ? "block" : "none")};
+`;
+
 const HistoryHeader = styled.div`
   display: flex;
   justify-content: space-between;
@@ -128,6 +155,27 @@ const ResendButton = styled.button`
   }
 `;
 
+const DeleteButton = styled.button`
+  padding: 12px 24px;
+  font-size: 18px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+
+  &:hover {
+    background-color: #c82333;
+  }
+
+  &:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+`;
+
 function App() {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
@@ -135,17 +183,59 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [dataHistory, setDataHistory] = useState([]);
+  const [currentApp, setCurrentApp] = useState(null);
   const MAX_RETRIES = 5;
   const INITIAL_RETRY_DELAY = 1000;
   const socketRef = useRef(null);
+  const [autoplayStates, setAutoplayStates] = useState({});
+  const autoplayIntervals = useRef({});
 
   useEffect(() => {
     // Load existing data from localStorage on mount
-    const savedData = localStorage.getItem("serialDataHistory");
-    if (savedData) {
-      setDataHistory(JSON.parse(savedData));
-    }
+    const loadHistoryFromStorage = () => {
+      const historyItems = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        try {
+          const item = JSON.parse(localStorage.getItem(key));
+          if (item.data && item.data.id) {
+            historyItems.push(item);
+          }
+        } catch (error) {
+          console.error("Error parsing history item:", error);
+        }
+      }
+      // Sort by timestamp descending
+      historyItems.sort(
+        (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+      );
+      setDataHistory(historyItems.slice(0, 10));
+    };
+
+    loadHistoryFromStorage();
   }, []);
+
+  const saveHistoryItem = (item) => {
+    if (item.data.id) {
+      localStorage.setItem(item.data.id, JSON.stringify(item));
+    }
+  };
+
+  const clearHistory = () => {
+    // Clear all history items from localStorage
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      try {
+        const item = JSON.parse(localStorage.getItem(key));
+        if (item.data && item.data.id) {
+          localStorage.removeItem(key);
+        }
+      } catch (error) {
+        console.error("Error parsing history item:", error);
+      }
+    }
+    setDataHistory([]);
+  };
 
   const connectWebSocket = useCallback(() => {
     if (socketRef.current) {
@@ -164,24 +254,137 @@ function App() {
       setConnected(true);
       setRetryCount(0);
       setSocket(ws);
+      // Request current app state when connection is established
+      ws.send(JSON.stringify({ action: "getCurrentApp" }));
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         setSerialData(data);
+
+        // Handle current app state
+        if (data.action === "currentApp") {
+          setCurrentApp(data.data.appId);
+          // Load history items for the current app
+          const historyItems = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            try {
+              const item = JSON.parse(localStorage.getItem(key));
+              if (item.data?.data?.currentApp === data.data.appId) {
+                historyItems.push(item);
+              }
+            } catch (error) {
+              console.error("Error parsing history item:", error);
+            }
+          }
+          // Sort by timestamp descending
+          historyItems.sort(
+            (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+          );
+          setDataHistory(historyItems.slice(0, 10));
+        }
+
+        // Handle app change events
+        if (data.action === "appChanged") {
+          setCurrentApp(data.data.appId);
+          // Clear history when app is exited
+          if (data.data.appId === null) {
+            setDataHistory([]);
+          } else {
+            // Load history items for the new app
+            const historyItems = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              try {
+                const item = JSON.parse(localStorage.getItem(key));
+                if (item.data?.data?.currentApp === data.data.appId) {
+                  historyItems.push(item);
+                }
+              } catch (error) {
+                console.error("Error parsing history item:", error);
+              }
+            }
+            // Sort by timestamp descending
+            historyItems.sort(
+              (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+            );
+            setDataHistory(historyItems.slice(0, 10));
+          }
+        }
+
+        // Handle screenshot data
+        if (data.action === "screenshotData") {
+          // Get existing item from localStorage
+          const itemId = data.id;
+          if (!itemId) {
+            console.error("No ID found in screenshot data");
+            return;
+          }
+
+          const existingItem = localStorage.getItem(itemId);
+
+          if (existingItem) {
+            try {
+              const item = JSON.parse(existingItem);
+              // Update with screenshot data
+              if (!item.data.screenshots) {
+                item.data.screenshots = [];
+              }
+              item.data.screenshots.push({
+                timestamp: new Date().toISOString(),
+                data: data.data
+              });
+              // Keep only the last 6 screenshots
+              item.data.screenshots = item.data.screenshots.slice(-6);
+              // Save back to localStorage
+              localStorage.setItem(itemId, JSON.stringify(item));
+
+              // Update state
+              setDataHistory((prevHistory) => {
+                const existingIndex = prevHistory.findIndex(
+                  (entry) => entry.data.id === itemId
+                );
+                if (existingIndex !== -1) {
+                  const updatedHistory = [...prevHistory];
+                  updatedHistory[existingIndex] = item;
+                  return updatedHistory;
+                }
+                return prevHistory;
+              });
+            } catch (error) {
+              console.error("Error updating screenshot data:", error);
+            }
+          }
+        }
+
         // Add to history if it's a server response or serialData response
         if (!data.action || data.action === "serialData") {
           const newEntry = {
-            data,
+            data: {
+              ...data,
+              screenshots: [] // Initialize with empty screenshots array
+            },
             timestamp: new Date().toISOString()
           };
           setDataHistory((prevHistory) => {
-            const updatedHistory = [newEntry, ...prevHistory].slice(0, 10); // Keep last 10 entries
-            localStorage.setItem(
-              "serialDataHistory",
-              JSON.stringify(updatedHistory)
+            const existingIndex = prevHistory.findIndex(
+              (entry) => entry.data.id === data.id
             );
+
+            let updatedHistory;
+            if (existingIndex !== -1) {
+              // Update existing entry
+              updatedHistory = [...prevHistory];
+              updatedHistory[existingIndex] = newEntry;
+            } else {
+              // Add new entry
+              updatedHistory = [newEntry, ...prevHistory].slice(0, 10);
+            }
+
+            // Save the new/updated item to localStorage
+            saveHistoryItem(newEntry);
             return updatedHistory;
           });
         }
@@ -237,15 +440,98 @@ function App() {
     }
   };
 
-  const clearHistory = () => {
-    setDataHistory([]);
-    localStorage.removeItem("serialDataHistory");
-  };
-
   const resendSerialData = (data) => {
     if (socket && connected) {
       socket.send(JSON.stringify({ action: "setSerialData", data }));
     }
+  };
+
+  // Show latest image when available
+  const showLatestImage = (itemId, screenshots) => {
+    const latestIndex = screenshots.length - 1;
+    setAutoplayStates((prev) => ({
+      ...prev,
+      [itemId]: {
+        currentIndex: latestIndex,
+        isPlaying: false
+      }
+    }));
+  };
+
+  // Start autoplay for a history item
+  const startAutoplay = useCallback((itemId, screenshots) => {
+    // Only start autoplay if we have exactly 6 screenshots
+    if (screenshots.length !== 6) {
+      showLatestImage(itemId, screenshots);
+      return;
+    }
+
+    if (autoplayIntervals.current[itemId]) {
+      clearInterval(autoplayIntervals.current[itemId]);
+    }
+
+    setAutoplayStates((prev) => ({
+      ...prev,
+      [itemId]: {
+        currentIndex: 0,
+        isPlaying: true
+      }
+    }));
+
+    autoplayIntervals.current[itemId] = setInterval(() => {
+      setAutoplayStates((prev) => {
+        const item = prev[itemId];
+        if (!item) return prev;
+
+        const nextIndex = (item.currentIndex + 1) % screenshots.length;
+        return {
+          ...prev,
+          [itemId]: {
+            ...item,
+            currentIndex: nextIndex
+          }
+        };
+      });
+    }, 200); // Change image every 200ms
+  }, []);
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    const intervals = autoplayIntervals.current;
+    return () => {
+      Object.values(intervals).forEach((interval) => {
+        if (interval) clearInterval(interval);
+      });
+    };
+  }, []);
+
+  // Handle screenshots when they become available
+  useEffect(() => {
+    dataHistory.forEach((entry) => {
+      if (entry.data.screenshots && entry.data.screenshots.length > 0) {
+        if (entry.data.screenshots.length === 6) {
+          startAutoplay(entry.data.id, entry.data.screenshots);
+        } else {
+          showLatestImage(entry.data.id, entry.data.screenshots);
+        }
+      }
+    });
+  }, [dataHistory, startAutoplay]);
+
+  const filteredHistory = useMemo(() => {
+    return dataHistory.filter(
+      (entry) => entry.data.data.currentApp === currentApp
+    );
+  }, [dataHistory, currentApp]);
+
+  const deleteHistoryItem = (itemId) => {
+    // Remove from localStorage
+    localStorage.removeItem(itemId);
+
+    // Update state
+    setDataHistory((prevHistory) =>
+      prevHistory.filter((entry) => entry.data.id !== itemId)
+    );
   };
 
   return (
@@ -254,6 +540,35 @@ function App() {
         <StatusIndicator $connected={connected}>
           {connected ? "Connected" : "Disconnected"}
         </StatusIndicator>
+
+        {currentApp ? (
+          <div
+            style={{
+              fontSize: "20px",
+              marginBottom: "20px",
+              padding: "10px",
+              backgroundColor: "#f8f9fa",
+              borderRadius: "4px",
+              textAlign: "center"
+            }}
+          >
+            Current App: {currentApp}
+          </div>
+        ) : (
+          <div
+            style={{
+              fontSize: "20px",
+              marginBottom: "20px",
+              padding: "10px",
+              backgroundColor: "#f8f9fa",
+              borderRadius: "4px",
+              textAlign: "center",
+              color: "#666"
+            }}
+          >
+            No app open
+          </div>
+        )}
 
         <RequestButton
           onClick={requestSerialData}
@@ -271,19 +586,57 @@ function App() {
               </ClearHistoryButton>
             </HistoryHeader>
             <ul>
-              {dataHistory.map((entry, index) => (
+              {filteredHistory.map((entry, index) => (
                 <li key={entry.timestamp}>
                   <HistoryItem>
-                    <div>
-                      {new Date(entry.timestamp).toLocaleString()}:{" "}
-                      {JSON.stringify(entry.data)}
-                    </div>
+                    <div>{new Date(entry.timestamp).toLocaleString()}</div>
+                    {entry.data.screenshots && (
+                      <>
+                        <ProgressBar>
+                          <ProgressFill
+                            $progress={entry.data.screenshots.length}
+                          />
+                        </ProgressBar>
+                      </>
+                    )}
+                    {entry.data.screenshots &&
+                      entry.data.screenshots.length > 0 && (
+                        <AutoplayContainer>
+                          {entry.data.screenshots.map((screenshot, index) => (
+                            <AutoplayImage
+                              key={index}
+                              src={`data:image/png;base64,${screenshot.data.replace(
+                                /^data:image\/png;base64,/,
+                                ""
+                              )}`}
+                              alt={`Screenshot ${index + 1}`}
+                              $isVisible={
+                                autoplayStates[entry.data.id]?.currentIndex ===
+                                index
+                              }
+                            />
+                          ))}
+                        </AutoplayContainer>
+                      )}
                     <ResendButton
                       onClick={() => resendSerialData(entry.data)}
-                      disabled={!connected}
+                      disabled={
+                        !connected ||
+                        !entry.data.screenshots ||
+                        entry.data.screenshots.length < 6
+                      }
                     >
                       Send
                     </ResendButton>
+                    <DeleteButton
+                      onClick={() => deleteHistoryItem(entry.data.id)}
+                      disabled={
+                        !entry.data.screenshots ||
+                        entry.data.screenshots.length < 6
+                      }
+                    >
+                      Delete
+                    </DeleteButton>
                   </HistoryItem>
                 </li>
               ))}
