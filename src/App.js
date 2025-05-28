@@ -214,7 +214,7 @@ function App() {
   const getApiUrl = () => {
     return process.env.NODE_ENV === "production"
       ? "https://play-machine-server.noshado.ws/api"
-      : "http://localhost:3103/api";
+      : "http://localhost:3205/api";
   };
 
   const validateApiKey = useCallback(
