@@ -191,10 +191,9 @@ function App() {
   const socketRef = useRef(null);
   const [autoplayStates, setAutoplayStates] = useState({});
   const autoplayIntervals = useRef({});
-  const MAX_API_KEY_LENGTH = 256; // Maximum length for API key
-  const API_KEY_REGEX = useMemo(() => /^[a-zA-Z0-9]+$/, []); // Only allow alphanumeric characters
+  const MAX_API_KEY_LENGTH = 256;
+  const API_KEY_REGEX = useMemo(() => /^[a-zA-Z0-9]+$/, []);
 
-  // Validate API key format
   const isValidApiKeyFormat = useCallback(
     (apiKey) => {
       if (!apiKey || typeof apiKey !== "string") return false;
@@ -206,21 +205,18 @@ function App() {
     [API_KEY_REGEX]
   );
 
-  // Get API key from URL query parameters
   const getApiKeyFromUrl = () => {
     const params = new URLSearchParams(window.location.search);
     const apiKey = params.get("apiKey");
     return apiKey ? apiKey.trim() : null;
   };
 
-  // Get base URL based on environment
   const getBaseUrl = () => {
     return process.env.NODE_ENV === "production"
       ? "https://play-machine-server.noshado.ws"
       : "http://localhost:3103";
   };
 
-  // Validate API key
   const validateApiKey = useCallback(
     async (apiKey) => {
       if (!apiKey) {
@@ -229,7 +225,6 @@ function App() {
         return;
       }
 
-      // First validate the format
       if (!isValidApiKeyFormat(apiKey)) {
         setIsApiKeyValid(false);
         setIsValidatingApiKey(false);
@@ -259,15 +254,13 @@ function App() {
     [isValidApiKeyFormat]
   );
 
-  // Validate API key only on initial mount
   useEffect(() => {
     const apiKey = getApiKeyFromUrl();
     validateApiKey(apiKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array means this only runs once on mount
+  }, []);
 
   useEffect(() => {
-    // Load existing data from localStorage on mount
     const loadHistoryFromStorage = () => {
       const historyItems = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -281,7 +274,6 @@ function App() {
           console.error("Error parsing history item:", error);
         }
       }
-      // Sort by timestamp descending
       historyItems.sort(
         (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
       );
@@ -298,7 +290,6 @@ function App() {
   };
 
   const clearHistory = () => {
-    // Clear all history items from localStorage
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
       try {
@@ -378,7 +369,6 @@ function App() {
       setConnected(true);
       setRetryCount(0);
       setSocket(ws);
-      // Request current app state when connection is established
       ws.send(
         JSON.stringify({
           action: "getCurrentApp",
@@ -392,10 +382,8 @@ function App() {
         const data = JSON.parse(event.data);
         setSerialData(data);
 
-        // Handle current app state
         if (data.action === "currentApp") {
           setCurrentApp(data.data.appId);
-          // Load history items for the current app
           const historyItems = [];
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -408,21 +396,17 @@ function App() {
               console.error("Error parsing history item:", error);
             }
           }
-          // Sort by timestamp descending
           historyItems.sort(
             (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
           );
           setDataHistory(historyItems.slice(0, 10));
         }
 
-        // Handle app change events
         if (data.action === "appChanged") {
           setCurrentApp(data.data.appId);
-          // Clear history when app is exited
           if (data.data.appId === null) {
             setDataHistory([]);
           } else {
-            // Load history items for the new app
             const historyItems = [];
             for (let i = 0; i < localStorage.length; i++) {
               const key = localStorage.key(i);
@@ -435,7 +419,6 @@ function App() {
                 console.error("Error parsing history item:", error);
               }
             }
-            // Sort by timestamp descending
             historyItems.sort(
               (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
             );
@@ -443,9 +426,7 @@ function App() {
           }
         }
 
-        // Handle screenshot data
         if (data.action === "screenshotData") {
-          // Get existing item from localStorage
           const itemId = data.id;
           if (!itemId) {
             console.error("No ID found in screenshot data");
@@ -457,7 +438,6 @@ function App() {
           if (existingItem) {
             try {
               const item = JSON.parse(existingItem);
-              // Update with screenshot data
               if (!item.data.screenshots) {
                 item.data.screenshots = [];
               }
@@ -465,12 +445,9 @@ function App() {
                 timestamp: new Date().toISOString(),
                 data: data.data
               });
-              // Keep only the last 6 screenshots
               item.data.screenshots = item.data.screenshots.slice(-6);
-              // Save back to localStorage
               localStorage.setItem(itemId, JSON.stringify(item));
 
-              // Update state
               setDataHistory((prevHistory) => {
                 const existingIndex = prevHistory.findIndex(
                   (entry) => entry.data.id === itemId
@@ -488,12 +465,11 @@ function App() {
           }
         }
 
-        // Add to history if it's a server response or serialData response
         if (!data.action || data.action === "serialData") {
           const newEntry = {
             data: {
               ...data,
-              screenshots: [] // Initialize with empty screenshots array
+              screenshots: []
             },
             timestamp: new Date().toISOString()
           };
@@ -504,15 +480,12 @@ function App() {
 
             let updatedHistory;
             if (existingIndex !== -1) {
-              // Update existing entry
               updatedHistory = [...prevHistory];
               updatedHistory[existingIndex] = newEntry;
             } else {
-              // Add new entry
               updatedHistory = [newEntry, ...prevHistory].slice(0, 10);
             }
 
-            // Save the new/updated item to localStorage
             saveHistoryItem(newEntry);
             return updatedHistory;
           });
@@ -567,7 +540,6 @@ function App() {
     };
   }, [connectWebSocket]);
 
-  // Show latest image when available
   const showLatestImage = (itemId, screenshots) => {
     const latestIndex = screenshots.length - 1;
     setAutoplayStates((prev) => ({
@@ -579,9 +551,7 @@ function App() {
     }));
   };
 
-  // Start autoplay for a history item
   const startAutoplay = useCallback((itemId, screenshots) => {
-    // Only start autoplay if we have exactly 6 screenshots
     if (screenshots.length !== 6) {
       showLatestImage(itemId, screenshots);
       return;
@@ -613,10 +583,9 @@ function App() {
           }
         };
       });
-    }, 200); // Change image every 200ms
+    }, 200);
   }, []);
 
-  // Cleanup intervals on unmount
   useEffect(() => {
     const intervals = autoplayIntervals.current;
     return () => {
@@ -626,7 +595,6 @@ function App() {
     };
   }, []);
 
-  // Handle screenshots when they become available
   useEffect(() => {
     dataHistory.forEach((entry) => {
       if (entry.data.screenshots && entry.data.screenshots.length > 0) {
@@ -646,10 +614,8 @@ function App() {
   }, [dataHistory, currentApp]);
 
   const deleteHistoryItem = (itemId) => {
-    // Remove from localStorage
     localStorage.removeItem(itemId);
 
-    // Update state
     setDataHistory((prevHistory) =>
       prevHistory.filter((entry) => entry.data.id !== itemId)
     );
