@@ -520,7 +520,7 @@ function App() {
 
   const filteredHistory = useMemo(() => {
     return dataHistory.filter(
-      (entry) => entry.data.data.currentApp === currentApp
+      (entry) => entry?.data?.data?.currentApp === currentApp
     );
   }, [dataHistory, currentApp]);
 
