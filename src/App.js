@@ -211,10 +211,10 @@ function App() {
     return apiKey ? apiKey.trim() : null;
   };
 
-  const getBaseUrl = () => {
+  const getApiUrl = () => {
     return process.env.NODE_ENV === "production"
-      ? "https://play-machine-server.noshado.ws"
-      : "http://localhost:3103";
+      ? "https://play-machine-server.noshado.ws/api"
+      : "http://localhost:3103/api";
   };
 
   const validateApiKey = useCallback(
@@ -233,9 +233,7 @@ function App() {
 
       try {
         const response = await fetch(
-          `${getBaseUrl()}/validate-api-key?apiKey=${encodeURIComponent(
-            apiKey
-          )}`
+          `${getApiUrl()}/validate-api-key?apiKey=${encodeURIComponent(apiKey)}`
         );
 
         if (!response.ok) {
@@ -359,8 +357,8 @@ function App() {
 
     const WEBSOCKET_URL =
       process.env.NODE_ENV === "production"
-        ? "wss://play-machine-server.noshado.ws"
-        : "ws://localhost:3103";
+        ? "wss://play-machine-server.noshado.ws/api"
+        : "ws://localhost:3103/api";
 
     const ws = new WebSocket(WEBSOCKET_URL);
     socketRef.current = ws;
