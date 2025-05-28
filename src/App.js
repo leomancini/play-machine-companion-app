@@ -357,8 +357,8 @@ function App() {
 
     const WEBSOCKET_URL =
       process.env.NODE_ENV === "production"
-        ? "wss://play-machine-server.noshado.ws/api"
-        : "ws://localhost:3103/api";
+        ? "wss://play-machine-server.noshado.ws/"
+        : "ws://localhost:3103/";
 
     const ws = new WebSocket(WEBSOCKET_URL);
     socketRef.current = ws;
