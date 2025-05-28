@@ -184,17 +184,87 @@ function App() {
   const [retryCount, setRetryCount] = useState(0);
   const [dataHistory, setDataHistory] = useState([]);
   const [currentApp, setCurrentApp] = useState(null);
+  const [isApiKeyValid, setIsApiKeyValid] = useState(false);
+  const [isValidatingApiKey, setIsValidatingApiKey] = useState(true);
   const MAX_RETRIES = 5;
   const INITIAL_RETRY_DELAY = 1000;
   const socketRef = useRef(null);
   const [autoplayStates, setAutoplayStates] = useState({});
   const autoplayIntervals = useRef({});
+  const MAX_API_KEY_LENGTH = 256; // Maximum length for API key
+  const API_KEY_REGEX = useMemo(() => /^[a-zA-Z0-9]+$/, []); // Only allow alphanumeric characters
+
+  // Validate API key format
+  const isValidApiKeyFormat = useCallback(
+    (apiKey) => {
+      if (!apiKey || typeof apiKey !== "string") return false;
+      if (apiKey.length < 24 || apiKey.length > MAX_API_KEY_LENGTH)
+        return false;
+      if (!API_KEY_REGEX.test(apiKey)) return false;
+      return true;
+    },
+    [API_KEY_REGEX]
+  );
 
   // Get API key from URL query parameters
   const getApiKeyFromUrl = () => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("apiKey");
+    const apiKey = params.get("apiKey");
+    return apiKey ? apiKey.trim() : null;
   };
+
+  // Get base URL based on environment
+  const getBaseUrl = () => {
+    return process.env.NODE_ENV === "production"
+      ? "https://play-machine-server.noshado.ws"
+      : "http://localhost:3103";
+  };
+
+  // Validate API key
+  const validateApiKey = useCallback(
+    async (apiKey) => {
+      if (!apiKey) {
+        setIsApiKeyValid(false);
+        setIsValidatingApiKey(false);
+        return;
+      }
+
+      // First validate the format
+      if (!isValidApiKeyFormat(apiKey)) {
+        setIsApiKeyValid(false);
+        setIsValidatingApiKey(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${getBaseUrl()}/validate-api-key?apiKey=${encodeURIComponent(
+            apiKey
+          )}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Validation request failed");
+        }
+
+        const data = await response.json();
+        setIsApiKeyValid(data.valid);
+      } catch (error) {
+        console.error("Error validating API key:", error);
+        setIsApiKeyValid(false);
+      } finally {
+        setIsValidatingApiKey(false);
+      }
+    },
+    [isValidApiKeyFormat]
+  );
+
+  // Validate API key only on initial mount
+  useEffect(() => {
+    const apiKey = getApiKeyFromUrl();
+    validateApiKey(apiKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array means this only runs once on mount
 
   useEffect(() => {
     // Load existing data from localStorage on mount
@@ -243,14 +313,62 @@ function App() {
     setDataHistory([]);
   };
 
+  const requestSerialData = () => {
+    if (!isApiKeyValid || !socket || !connected) {
+      return;
+    }
+
+    const apiKey = getApiKeyFromUrl();
+    if (!apiKey || !isValidApiKeyFormat(apiKey)) {
+      return;
+    }
+
+    socket.send(
+      JSON.stringify({
+        action: "getSerialData",
+        apiKey
+      })
+    );
+    setLoading(true);
+    setSerialData(null);
+  };
+
+  const resendSerialData = (data) => {
+    if (!isApiKeyValid || !socket || !connected) {
+      return;
+    }
+
+    const apiKey = getApiKeyFromUrl();
+    if (!apiKey || !isValidApiKeyFormat(apiKey)) {
+      return;
+    }
+
+    socket.send(
+      JSON.stringify({
+        action: "setSerialData",
+        data,
+        apiKey
+      })
+    );
+  };
+
   const connectWebSocket = useCallback(() => {
+    if (!isApiKeyValid) {
+      return;
+    }
+
+    const apiKey = getApiKeyFromUrl();
+    if (!apiKey || !isValidApiKeyFormat(apiKey)) {
+      return;
+    }
+
     if (socketRef.current) {
       socketRef.current.close();
     }
 
     const WEBSOCKET_URL =
       process.env.NODE_ENV === "production"
-        ? "wss://play-machine-server.noshado.ws/"
+        ? "wss://play-machine-server.noshado.ws"
         : "ws://localhost:3103";
 
     const ws = new WebSocket(WEBSOCKET_URL);
@@ -264,7 +382,7 @@ function App() {
       ws.send(
         JSON.stringify({
           action: "getCurrentApp",
-          apiKey: getApiKeyFromUrl()
+          apiKey
         })
       );
     };
@@ -430,7 +548,13 @@ function App() {
         );
       }
     };
-  }, [retryCount, MAX_RETRIES, INITIAL_RETRY_DELAY]);
+  }, [
+    retryCount,
+    MAX_RETRIES,
+    INITIAL_RETRY_DELAY,
+    isValidApiKeyFormat,
+    isApiKeyValid
+  ]);
 
   useEffect(() => {
     connectWebSocket();
@@ -442,31 +566,6 @@ function App() {
       }
     };
   }, [connectWebSocket]);
-
-  const requestSerialData = () => {
-    if (socket && connected) {
-      socket.send(
-        JSON.stringify({
-          action: "getSerialData",
-          apiKey: getApiKeyFromUrl()
-        })
-      );
-      setLoading(true);
-      setSerialData(null);
-    }
-  };
-
-  const resendSerialData = (data) => {
-    if (socket && connected) {
-      socket.send(
-        JSON.stringify({
-          action: "setSerialData",
-          data,
-          apiKey: getApiKeyFromUrl()
-        })
-      );
-    }
-  };
 
   // Show latest image when available
   const showLatestImage = (itemId, screenshots) => {
@@ -559,7 +658,19 @@ function App() {
   return (
     <Page>
       <ContentWrapper>
-        {!getApiKeyFromUrl() ? (
+        {isValidatingApiKey ? (
+          <div
+            style={{
+              fontSize: "20px",
+              padding: "20px",
+              backgroundColor: "#f8f9fa",
+              borderRadius: "4px",
+              textAlign: "center"
+            }}
+          >
+            Validating API key...
+          </div>
+        ) : !getApiKeyFromUrl() ? (
           <div
             style={{
               fontSize: "20px",
@@ -572,6 +683,19 @@ function App() {
           >
             No API key provided. Please add an API key to the URL query
             parameters.
+          </div>
+        ) : !isApiKeyValid ? (
+          <div
+            style={{
+              fontSize: "20px",
+              padding: "20px",
+              backgroundColor: "#f8f9fa",
+              borderRadius: "4px",
+              textAlign: "center",
+              color: "#dc3545"
+            }}
+          >
+            Invalid API key. Please check your API key and try again.
           </div>
         ) : (
           <>
