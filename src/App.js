@@ -190,6 +190,12 @@ function App() {
   const [autoplayStates, setAutoplayStates] = useState({});
   const autoplayIntervals = useRef({});
 
+  // Get API key from URL query parameters
+  const getApiKeyFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("apiKey");
+  };
+
   useEffect(() => {
     // Load existing data from localStorage on mount
     const loadHistoryFromStorage = () => {
@@ -255,7 +261,12 @@ function App() {
       setRetryCount(0);
       setSocket(ws);
       // Request current app state when connection is established
-      ws.send(JSON.stringify({ action: "getCurrentApp" }));
+      ws.send(
+        JSON.stringify({
+          action: "getCurrentApp",
+          apiKey: getApiKeyFromUrl()
+        })
+      );
     };
 
     ws.onmessage = (event) => {
@@ -434,7 +445,12 @@ function App() {
 
   const requestSerialData = () => {
     if (socket && connected) {
-      socket.send(JSON.stringify({ action: "getSerialData" }));
+      socket.send(
+        JSON.stringify({
+          action: "getSerialData",
+          apiKey: getApiKeyFromUrl()
+        })
+      );
       setLoading(true);
       setSerialData(null);
     }
@@ -442,7 +458,13 @@ function App() {
 
   const resendSerialData = (data) => {
     if (socket && connected) {
-      socket.send(JSON.stringify({ action: "setSerialData", data }));
+      socket.send(
+        JSON.stringify({
+          action: "setSerialData",
+          data,
+          apiKey: getApiKeyFromUrl()
+        })
+      );
     }
   };
 
@@ -537,111 +559,131 @@ function App() {
   return (
     <Page>
       <ContentWrapper>
-        <StatusIndicator $connected={connected}>
-          {connected ? "Connected" : "Disconnected"}
-        </StatusIndicator>
-
-        {currentApp ? (
+        {!getApiKeyFromUrl() ? (
           <div
             style={{
               fontSize: "20px",
-              marginBottom: "20px",
-              padding: "10px",
-              backgroundColor: "#f8f9fa",
-              borderRadius: "4px",
-              textAlign: "center"
-            }}
-          >
-            Current App: {currentApp}
-          </div>
-        ) : (
-          <div
-            style={{
-              fontSize: "20px",
-              marginBottom: "20px",
-              padding: "10px",
+              padding: "20px",
               backgroundColor: "#f8f9fa",
               borderRadius: "4px",
               textAlign: "center",
-              color: "#666"
+              color: "#dc3545"
             }}
           >
-            No app open
+            No API key provided. Please add an API key to the URL query
+            parameters.
           </div>
-        )}
+        ) : (
+          <>
+            <StatusIndicator $connected={connected}>
+              {connected ? "Connected" : "Disconnected"}
+            </StatusIndicator>
 
-        <RequestButton
-          onClick={requestSerialData}
-          disabled={!connected || loading}
-        >
-          {loading ? "Loading..." : "Request Current Serial Data"}
-        </RequestButton>
+            {currentApp ? (
+              <div
+                style={{
+                  fontSize: "20px",
+                  marginBottom: "20px",
+                  padding: "10px",
+                  backgroundColor: "#f8f9fa",
+                  borderRadius: "4px",
+                  textAlign: "center"
+                }}
+              >
+                Current App: {currentApp}
+              </div>
+            ) : (
+              <div
+                style={{
+                  fontSize: "20px",
+                  marginBottom: "20px",
+                  padding: "10px",
+                  backgroundColor: "#f8f9fa",
+                  borderRadius: "4px",
+                  textAlign: "center",
+                  color: "#666"
+                }}
+              >
+                No app open
+              </div>
+            )}
 
-        {dataHistory.length > 0 && (
-          <HistoryList>
-            <HistoryHeader>
-              <h3 style={{ margin: 0 }}>History:</h3>
-              <ClearHistoryButton onClick={clearHistory}>
-                Clear History
-              </ClearHistoryButton>
-            </HistoryHeader>
-            <ul>
-              {filteredHistory.map((entry, index) => (
-                <li key={entry.timestamp}>
-                  <HistoryItem>
-                    <div>{new Date(entry.timestamp).toLocaleString()}</div>
-                    {entry.data.screenshots && (
-                      <>
-                        <ProgressBar>
-                          <ProgressFill
-                            $progress={entry.data.screenshots.length}
-                          />
-                        </ProgressBar>
-                      </>
-                    )}
-                    {entry.data.screenshots &&
-                      entry.data.screenshots.length > 0 && (
-                        <AutoplayContainer>
-                          {entry.data.screenshots.map((screenshot, index) => (
-                            <AutoplayImage
-                              key={index}
-                              src={`data:image/png;base64,${screenshot.data.replace(
-                                /^data:image\/png;base64,/,
-                                ""
-                              )}`}
-                              alt={`Screenshot ${index + 1}`}
-                              $isVisible={
-                                autoplayStates[entry.data.id]?.currentIndex ===
-                                index
-                              }
-                            />
-                          ))}
-                        </AutoplayContainer>
-                      )}
-                    <ResendButton
-                      onClick={() => resendSerialData(entry.data)}
-                      disabled={
-                        !connected ||
-                        !entry.data.screenshots ||
-                        entry.data.screenshots.length < 6
-                      }
-                    >
-                      Send
-                    </ResendButton>
-                    <DeleteButton
-                      onClick={() => deleteHistoryItem(entry.data.id)}
-                      disabled={
-                        !entry.data.screenshots ||
-                        entry.data.screenshots.length < 6
-                      }
-                    >
-                      Delete
-                    </DeleteButton>
-                  </HistoryItem>
-                </li>
-              ))}
-            </ul>
-          </HistoryList>
+            <RequestButton
+              onClick={requestSerialData}
+              disabled={!connected || loading}
+            >
+              {loading ? "Loading..." : "Request Current Serial Data"}
+            </RequestButton>
+
+            {dataHistory.length > 0 && (
+              <HistoryList>
+                <HistoryHeader>
+                  <h3 style={{ margin: 0 }}>History:</h3>
+                  <ClearHistoryButton onClick={clearHistory}>
+                    Clear History
+                  </ClearHistoryButton>
+                </HistoryHeader>
+                <ul>
+                  {filteredHistory.map((entry, index) => (
+                    <li key={entry.timestamp}>
+                      <HistoryItem>
+                        <div>{new Date(entry.timestamp).toLocaleString()}</div>
+                        {entry.data.screenshots && (
+                          <>
+                            <ProgressBar>
+                              <ProgressFill
+                                $progress={entry.data.screenshots.length}
+                              />
+                            </ProgressBar>
+                          </>
+                        )}
+                        {entry.data.screenshots &&
+                          entry.data.screenshots.length > 0 && (
+                            <AutoplayContainer>
+                              {entry.data.screenshots.map(
+                                (screenshot, index) => (
+                                  <AutoplayImage
+                                    key={index}
+                                    src={`data:image/png;base64,${screenshot.data.replace(
+                                      /^data:image\/png;base64,/,
+                                      ""
+                                    )}`}
+                                    alt={`Screenshot ${index + 1}`}
+                                    $isVisible={
+                                      autoplayStates[entry.data.id]
+                                        ?.currentIndex === index
+                                    }
+                                  />
+                                )
+                              )}
+                            </AutoplayContainer>
+                          )}
+                        <ResendButton
+                          onClick={() => resendSerialData(entry.data)}
+                          disabled={
+                            !connected ||
+                            !entry.data.screenshots ||
+                            entry.data.screenshots.length < 6
+                          }
+                        >
+                          Send
+                        </ResendButton>
+                        <DeleteButton
+                          onClick={() => deleteHistoryItem(entry.data.id)}
+                          disabled={
+                            !entry.data.screenshots ||
+                            entry.data.screenshots.length < 6
+                          }
+                        >
+                          Delete
+                        </DeleteButton>
+                      </HistoryItem>
+                    </li>
+                  ))}
+                </ul>
+              </HistoryList>
+            )}
+          </>
         )}
       </ContentWrapper>
     </Page>
