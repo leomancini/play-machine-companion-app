@@ -184,6 +184,7 @@ function App() {
   const [retryCount, setRetryCount] = useState(0);
   const [dataHistory, setDataHistory] = useState([]);
   const [currentApp, setCurrentApp] = useState(null);
+  const [currentTheme, setCurrentTheme] = useState(null);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
   const [isValidatingApiKey, setIsValidatingApiKey] = useState(true);
   const MAX_RETRIES = 5;
@@ -373,12 +374,22 @@ function App() {
           apiKey
         })
       );
+      ws.send(
+        JSON.stringify({
+          action: "getCurrentTheme",
+          apiKey
+        })
+      );
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         setSerialData(data);
+
+        if (data.action === "currentTheme") {
+          setCurrentTheme(data.data.theme);
+        }
 
         if (data.action === "currentApp") {
           setCurrentApp(data.data.appId);
@@ -693,6 +704,21 @@ function App() {
                 }}
               >
                 No app open
+              </div>
+            )}
+
+            {currentTheme && (
+              <div
+                style={{
+                  fontSize: "20px",
+                  marginBottom: "20px",
+                  padding: "10px",
+                  backgroundColor: "#f8f9fa",
+                  borderRadius: "4px",
+                  textAlign: "center"
+                }}
+              >
+                Current Theme: {currentTheme}
               </div>
             )}
 
