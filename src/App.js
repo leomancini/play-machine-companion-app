@@ -845,7 +845,32 @@ function App() {
     );
   }, [dataHistory, currentApp]);
 
-  const deleteHistoryItem = (itemId) => {
+  const deleteHistoryItem = async (itemId) => {
+    try {
+      const apiKey = getApiKeyFromUrl();
+      if (apiKey && isValidApiKeyFormat(apiKey)) {
+        // Call the delete endpoint
+        const response = await fetch(
+          `${getApiUrl()}/delete-screenshots/${itemId}?apiKey=${encodeURIComponent(
+            apiKey
+          )}`,
+          {
+            method: "DELETE"
+          }
+        );
+
+        if (!response.ok) {
+          console.error(
+            "Failed to delete screenshots from server:",
+            response.status
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting screenshots from server:", error);
+    }
+
+    // Remove from localStorage and update local state regardless of API call result
     localStorage.removeItem(itemId);
 
     setDataHistory((prevHistory) =>
