@@ -5,76 +5,45 @@ import React, {
   useRef,
   useMemo
 } from "react";
-import styled from "styled-components";
+import styled, { ThemeProvider } from "styled-components";
+import Button from "./components/Button";
 
 const Page = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
-  font-size: 24px;
-  color: #333;
-  padding: 20px;
+  font-size: 1.5rem;
+  color: ${(props) => props.theme.text};
+  background-color: ${(props) => props.theme.background};
+  font-family: ${(props) => props.theme.fontFamily};
+  text-transform: ${(props) => props.theme.textTransform};
+  padding: 1.25rem;
   overflow-y: auto;
   box-sizing: border-box;
 `;
 
 const ContentWrapper = styled.div`
   width: 100%;
-  max-width: 800px;
+  max-width: 50rem;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 20px 0;
+  gap: 1.25rem;
+  padding: 1.25rem 0;
 `;
 
 const StatusIndicator = styled.div`
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-size: 14px;
-  margin-bottom: 20px;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
   background-color: ${(props) => (props.$connected ? "#4CAF50" : "#F44336")};
   color: white;
 `;
 
-const RequestButton = styled.button`
-  padding: 12px 24px;
-  font-size: 18px;
-  background-color: #0066cc;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  width: 100%;
-
-  &:hover {
-    background-color: #0052a3;
-  }
-
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-`;
-
-const ClearHistoryButton = styled.button`
-  padding: 8px 16px;
-  font-size: 14px;
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-bottom: 20px;
-
-  &:hover {
-    background-color: #c82333;
-  }
-`;
-
 const HistoryList = styled.div`
   width: 100%;
-  max-width: 800px;
+  max-width: 50rem;
 
   ul {
     list-style: none;
@@ -88,27 +57,31 @@ const HistoryList = styled.div`
 `;
 
 const HistoryItem = styled.div`
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  padding: 15px;
+  background: ${(props) => props.theme.menuBackground};
+  border: 0.0625rem solid ${(props) => props.theme.border};
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
+  padding: 0.9375rem;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0.625rem;
+  color: ${(props) => props.theme.text};
+  font-family: ${(props) => props.theme.fontFamily};
 `;
 
 const ProgressBar = styled.div`
   width: 100%;
-  height: 8px;
-  background-color: #e9ecef;
-  border-radius: 4px;
+  height: 0.5rem;
+  background-color: ${(props) => props.theme.background};
+  border: 0.0625rem solid ${(props) => props.theme.border};
+  border-radius: 0.25rem;
   overflow: hidden;
-  margin: 5px 0;
+  margin: 0.3125rem 0;
 `;
 
 const ProgressFill = styled.div`
   height: 100%;
-  background-color: #0066cc;
+  background-color: ${(props) => props.theme.accent};
   width: ${(props) => (props.$progress / 5) * 100}%;
   transition: width 0.3s ease;
 `;
@@ -116,9 +89,9 @@ const ProgressFill = styled.div`
 const AutoplayContainer = styled.div`
   position: relative;
   width: 100%;
-  margin: 10px 0;
+  margin: 0.625rem 0;
   background: #000;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   overflow: hidden;
 `;
 
@@ -132,49 +105,67 @@ const HistoryHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 0.625rem;
 `;
 
-const ResendButton = styled.button`
-  padding: 12px 24px;
-  font-size: 18px;
-  background-color: #28a745;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  width: 100%;
-
-  &:hover {
-    background-color: #218838;
-  }
-
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
+const ValidationMessage = styled.div`
+  font-size: 1.25rem;
+  padding: 1.25rem;
+  background-color: #f8f9fa;
+  border-radius: 0.25rem;
+  text-align: center;
 `;
 
-const DeleteButton = styled.button`
-  padding: 12px 24px;
-  font-size: 18px;
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  width: 100%;
-  margin-top: 10px;
-
-  &:hover {
-    background-color: #c82333;
-  }
-
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
+const ErrorMessage = styled(ValidationMessage)`
+  color: #dc3545;
 `;
+
+const AppStatusContainer = styled.div`
+  font-size: 1.25rem;
+  margin-bottom: 1.25rem;
+  padding: 0.625rem;
+  border-radius: 0.25rem;
+  text-align: center;
+`;
+
+const NoAppMessage = styled(AppStatusContainer)`
+  color: #666;
+`;
+
+const ThemeStatusContainer = styled.div`
+  font-size: 1.25rem;
+  margin-bottom: 1.25rem;
+  padding: 0.625rem;
+  border-radius: 0.25rem;
+  text-align: center;
+`;
+
+const HistoryTitle = styled.h3`
+  margin: 0;
+`;
+
+const LoadingStepsContainer = styled.div`
+  font-size: 1.25rem;
+  padding: 1.25rem;
+  background-color: #f8f9fa;
+  border-radius: 0.25rem;
+  text-align: center;
+  margin-bottom: 1.25rem;
+`;
+
+// Theme configuration mapping
+const defaultTheme = {
+  accent: "rgba(0, 102, 204, 1)",
+  background: "#ffffff",
+  border: "rgba(0, 102, 204, 0.3)",
+  fontFamily: "system-ui, -apple-system, sans-serif",
+  menuBackground: "#f8f9fa",
+  menuSelectedBackground: "rgba(0, 102, 204, 1)",
+  menuSelectedText: "#ffffff",
+  menuText: "#333333",
+  text: "#333333",
+  textTransform: "none"
+};
 
 function App() {
   const [socket, setSocket] = useState(null);
@@ -187,6 +178,11 @@ function App() {
   const [currentTheme, setCurrentTheme] = useState(null);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
   const [isValidatingApiKey, setIsValidatingApiKey] = useState(true);
+  const [themes, setThemes] = useState([]);
+  const [isLoadingThemes, setIsLoadingThemes] = useState(false);
+  const [initializationStep, setInitializationStep] = useState("validating"); // validating, connecting, themes, app, ready
+  const [hasReceivedTheme, setHasReceivedTheme] = useState(false);
+  const [hasReceivedApp, setHasReceivedApp] = useState(false);
   const MAX_RETRIES = 5;
   const INITIAL_RETRY_DELAY = 1000;
   const socketRef = useRef(null);
@@ -194,6 +190,20 @@ function App() {
   const autoplayIntervals = useRef({});
   const MAX_API_KEY_LENGTH = 256;
   const API_KEY_REGEX = useMemo(() => /^[a-zA-Z0-9]+$/, []);
+
+  // Get the current theme object based on the current theme data from API
+  const currentThemeObject = useMemo(() => {
+    if (currentTheme && Object.keys(themes).length > 0) {
+      // Check if the current theme exists in the themes object
+      if (themes[currentTheme]) {
+        return {
+          ...defaultTheme,
+          ...themes[currentTheme]
+        };
+      }
+    }
+    return defaultTheme;
+  }, [currentTheme, themes]);
 
   const isValidApiKeyFormat = useCallback(
     (apiKey) => {
@@ -217,6 +227,39 @@ function App() {
       ? "https://play-machine-server.noshado.ws/api"
       : "http://localhost:3205/api";
   };
+
+  const fetchThemes = useCallback(async () => {
+    setIsLoadingThemes(true);
+    try {
+      const response = await fetch(`${getApiUrl()}/themes`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("fetchThemes: response not ok", {
+          status: response.status,
+          errorText
+        });
+        throw new Error(
+          `Failed to fetch themes: ${response.status} ${errorText}`
+        );
+      }
+
+      const themesData = await response.json();
+      setThemes(themesData);
+      setInitializationStep("app");
+    } catch (error) {
+      console.error("Error fetching themes:", error);
+      setThemes([]);
+      setInitializationStep("app");
+    } finally {
+      setIsLoadingThemes(false);
+    }
+  }, []);
 
   const uploadScreenshot = useCallback(async (id, index, data) => {
     try {
@@ -325,6 +368,9 @@ function App() {
 
         const data = await response.json();
         setIsApiKeyValid(data.valid);
+        if (data.valid) {
+          setInitializationStep("connecting");
+        }
       } catch (error) {
         console.error("Error validating API key:", error);
         setIsApiKeyValid(false);
@@ -432,10 +478,12 @@ function App() {
 
         if (data.action === "currentTheme") {
           setCurrentTheme(data.data.theme);
+          setHasReceivedTheme(true);
         }
 
         if (data.action === "currentApp") {
           setCurrentApp(data.data.appId);
+          setHasReceivedApp(true);
           const historyItems = [];
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -713,6 +761,11 @@ function App() {
       setConnected(true);
       setRetryCount(0);
       setSocket(ws);
+      setInitializationStep("themes");
+
+      // Fetch themes when WebSocket connects
+      fetchThemes();
+
       ws.send(
         JSON.stringify({
           action: "getCurrentApp",
@@ -758,7 +811,8 @@ function App() {
     retryCount,
     MAX_RETRIES,
     INITIAL_RETRY_DELAY,
-    handleWebSocketMessage
+    handleWebSocketMessage,
+    fetchThemes
   ]);
 
   useEffect(() => {
@@ -878,176 +932,162 @@ function App() {
     );
   };
 
+  // Check if initialization is complete
+  useEffect(() => {
+    if (hasReceivedTheme && hasReceivedApp && initializationStep === "app") {
+      setInitializationStep("ready");
+    }
+  }, [hasReceivedTheme, hasReceivedApp, initializationStep]);
+
+  // Also check if we should transition to ready state based on available data
+  useEffect(() => {
+    if (
+      connected &&
+      !isLoadingThemes &&
+      themes &&
+      Object.keys(themes).length > 0 &&
+      hasReceivedTheme &&
+      hasReceivedApp
+    ) {
+      setInitializationStep("ready");
+    }
+  }, [connected, isLoadingThemes, themes, hasReceivedTheme, hasReceivedApp]);
+
+  const isInitializationComplete = initializationStep === "ready";
+
   return (
-    <Page>
-      <ContentWrapper>
-        {isValidatingApiKey ? (
-          <div
-            style={{
-              fontSize: "20px",
-              padding: "20px",
-              backgroundColor: "#f8f9fa",
-              borderRadius: "4px",
-              textAlign: "center"
-            }}
-          >
-            Validating API key...
-          </div>
-        ) : !getApiKeyFromUrl() ? (
-          <div
-            style={{
-              fontSize: "20px",
-              padding: "20px",
-              backgroundColor: "#f8f9fa",
-              borderRadius: "4px",
-              textAlign: "center",
-              color: "#dc3545"
-            }}
-          >
-            No API key provided. Please add an API key to the URL query
-            parameters.
-          </div>
-        ) : !isApiKeyValid ? (
-          <div
-            style={{
-              fontSize: "20px",
-              padding: "20px",
-              backgroundColor: "#f8f9fa",
-              borderRadius: "4px",
-              textAlign: "center",
-              color: "#dc3545"
-            }}
-          >
-            Invalid API key. Please check your API key and try again.
-          </div>
-        ) : (
-          <>
-            <StatusIndicator $connected={connected}>
-              {connected ? "Connected" : "Disconnected"}
-            </StatusIndicator>
+    <ThemeProvider theme={currentThemeObject}>
+      <Page>
+        <ContentWrapper>
+          {!getApiKeyFromUrl() ? (
+            <ErrorMessage>
+              No API key provided. Please add an API key to the URL query
+              parameters.
+            </ErrorMessage>
+          ) : !isApiKeyValid && !isValidatingApiKey ? (
+            <ErrorMessage>
+              Invalid API key. Please check your API key and try again.
+            </ErrorMessage>
+          ) : !isInitializationComplete ? (
+            <LoadingStepsContainer>
+              {initializationStep === "validating" && (
+                <div>Validating API key...</div>
+              )}
+              {initializationStep === "connecting" && (
+                <div>Connecting to server...</div>
+              )}
+              {initializationStep === "themes" && <div>Loading themes...</div>}
+              {initializationStep === "app" && (
+                <div>Getting current app and theme...</div>
+              )}
+            </LoadingStepsContainer>
+          ) : (
+            <>
+              <StatusIndicator $connected={connected}>
+                {connected ? "Connected" : "Disconnected"}
+              </StatusIndicator>
 
-            {currentApp ? (
-              <div
-                style={{
-                  fontSize: "20px",
-                  marginBottom: "20px",
-                  padding: "10px",
-                  backgroundColor: "#f8f9fa",
-                  borderRadius: "4px",
-                  textAlign: "center"
-                }}
+              {currentApp ? (
+                <AppStatusContainer>
+                  Current App: {currentApp}
+                </AppStatusContainer>
+              ) : (
+                <NoAppMessage>No app open</NoAppMessage>
+              )}
+
+              {currentTheme && (
+                <ThemeStatusContainer>
+                  Current Theme: {currentTheme}
+                </ThemeStatusContainer>
+              )}
+
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={requestSerialData}
+                disabled={!connected || loading}
               >
-                Current App: {currentApp}
-              </div>
-            ) : (
-              <div
-                style={{
-                  fontSize: "20px",
-                  marginBottom: "20px",
-                  padding: "10px",
-                  backgroundColor: "#f8f9fa",
-                  borderRadius: "4px",
-                  textAlign: "center",
-                  color: "#666"
-                }}
-              >
-                No app open
-              </div>
-            )}
+                {loading ? "Loading..." : "Request Current Serial Data"}
+              </Button>
 
-            {currentTheme && (
-              <div
-                style={{
-                  fontSize: "20px",
-                  marginBottom: "20px",
-                  padding: "10px",
-                  backgroundColor: "#f8f9fa",
-                  borderRadius: "4px",
-                  textAlign: "center"
-                }}
-              >
-                Current Theme: {currentTheme}
-              </div>
-            )}
-
-            <RequestButton
-              onClick={requestSerialData}
-              disabled={!connected || loading}
-            >
-              {loading ? "Loading..." : "Request Current Serial Data"}
-            </RequestButton>
-
-            {dataHistory.length > 0 && (
-              <HistoryList>
-                <HistoryHeader>
-                  <h3 style={{ margin: 0 }}>History:</h3>
-                  <ClearHistoryButton onClick={clearHistory}>
-                    Clear History
-                  </ClearHistoryButton>
-                </HistoryHeader>
-                <ul>
-                  {filteredHistory.map((entry, index) => (
-                    <li key={entry.timestamp}>
-                      <HistoryItem>
-                        <div>{new Date(entry.timestamp).toLocaleString()}</div>
-                        {entry.data.screenshots && (
-                          <>
-                            <ProgressBar>
-                              <ProgressFill
-                                $progress={entry.data.screenshots.length}
-                              />
-                            </ProgressBar>
-                          </>
-                        )}
-                        {entry.data.screenshots &&
-                          entry.data.screenshots.length > 0 && (
-                            <AutoplayContainer>
-                              {entry.data.screenshots.map(
-                                (screenshot, index) => {
-                                  const isVisible =
-                                    autoplayStates[entry.data.id]
-                                      ?.currentIndex === index;
-                                  return (
-                                    <AutoplayImage
-                                      key={index}
-                                      src={screenshot.data}
-                                      alt={`Screenshot ${index + 1}`}
-                                      $isVisible={isVisible}
-                                    />
-                                  );
-                                }
-                              )}
-                            </AutoplayContainer>
+              {dataHistory.length > 0 && (
+                <HistoryList>
+                  <HistoryHeader>
+                    <HistoryTitle>History:</HistoryTitle>
+                    <Button variant="clear" size="small" onClick={clearHistory}>
+                      Clear History
+                    </Button>
+                  </HistoryHeader>
+                  <ul>
+                    {filteredHistory.map((entry, index) => (
+                      <li key={entry.timestamp}>
+                        <HistoryItem>
+                          <div>
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </div>
+                          {entry.data.screenshots && (
+                            <>
+                              <ProgressBar>
+                                <ProgressFill
+                                  $progress={entry.data.screenshots.length}
+                                />
+                              </ProgressBar>
+                            </>
                           )}
-                        <ResendButton
-                          onClick={() => resendSerialData(entry.data)}
-                          disabled={
-                            !connected ||
-                            !entry.data.screenshots ||
-                            entry.data.screenshots.length < 6
-                          }
-                        >
-                          Send
-                        </ResendButton>
-                        <DeleteButton
-                          onClick={() => deleteHistoryItem(entry.data.id)}
-                          disabled={
-                            !entry.data.screenshots ||
-                            entry.data.screenshots.length < 6
-                          }
-                        >
-                          Delete
-                        </DeleteButton>
-                      </HistoryItem>
-                    </li>
-                  ))}
-                </ul>
-              </HistoryList>
-            )}
-          </>
-        )}
-      </ContentWrapper>
-    </Page>
+                          {entry.data.screenshots &&
+                            entry.data.screenshots.length > 0 && (
+                              <AutoplayContainer>
+                                {entry.data.screenshots.map(
+                                  (screenshot, index) => {
+                                    const isVisible =
+                                      autoplayStates[entry.data.id]
+                                        ?.currentIndex === index;
+                                    return (
+                                      <AutoplayImage
+                                        key={index}
+                                        src={screenshot.data}
+                                        alt={`Screenshot ${index + 1}`}
+                                        $isVisible={isVisible}
+                                      />
+                                    );
+                                  }
+                                )}
+                              </AutoplayContainer>
+                            )}
+                          <Button
+                            variant="secondary"
+                            fullWidth
+                            onClick={() => resendSerialData(entry.data)}
+                            disabled={
+                              !connected ||
+                              !entry.data.screenshots ||
+                              entry.data.screenshots.length < 6
+                            }
+                          >
+                            Send
+                          </Button>
+                          <Button
+                            variant="danger"
+                            fullWidth
+                            onClick={() => deleteHistoryItem(entry.data.id)}
+                            disabled={
+                              !entry.data.screenshots ||
+                              entry.data.screenshots.length < 6
+                            }
+                          >
+                            Delete
+                          </Button>
+                        </HistoryItem>
+                      </li>
+                    ))}
+                  </ul>
+                </HistoryList>
+              )}
+            </>
+          )}
+        </ContentWrapper>
+      </Page>
+    </ThemeProvider>
   );
 }
 
