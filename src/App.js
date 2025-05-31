@@ -218,6 +218,88 @@ function App() {
       : "http://localhost:3205/api";
   };
 
+  const uploadScreenshot = useCallback(async (id, index, data) => {
+    try {
+      // Validate inputs
+      if (!id) {
+        console.error("uploadScreenshot: missing id", {
+          id,
+          index,
+          data: data ? "present" : "missing"
+        });
+        return null;
+      }
+      if (index === undefined || index === null) {
+        console.error("uploadScreenshot: missing index", {
+          id,
+          index,
+          data: data ? "present" : "missing"
+        });
+        return null;
+      }
+      if (!data) {
+        console.error("uploadScreenshot: missing data", {
+          id,
+          index,
+          data: data ? "present" : "missing"
+        });
+        return null;
+      }
+
+      const apiKey = getApiKeyFromUrl();
+      if (!apiKey) {
+        console.error("uploadScreenshot: missing API key");
+        return null;
+      }
+
+      const cleanedData = data.replace(/^data:image\/png;base64,/, "");
+      const payload = {
+        id,
+        index,
+        data: cleanedData,
+        apiKey
+      };
+
+      const response = await fetch(`${getApiUrl()}/save-screenshot`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("uploadScreenshot: response not ok", {
+          status: response.status,
+          errorText
+        });
+        throw new Error(
+          `Failed to upload screenshot: ${response.status} ${errorText}`
+        );
+      }
+
+      const result = await response.json();
+
+      // Construct the proper server URL using the returned path
+      let screenshotUrl = result.path;
+
+      if (screenshotUrl) {
+        const serverBaseUrl =
+          process.env.NODE_ENV === "production"
+            ? "https://play-machine-server.noshado.ws"
+            : "http://localhost:3205";
+
+        screenshotUrl = `${serverBaseUrl}/api/${screenshotUrl}`;
+      }
+
+      return screenshotUrl;
+    } catch (error) {
+      console.error("Error uploading screenshot:", error);
+      return null;
+    }
+  }, []);
+
   const validateApiKey = useCallback(
     async (apiKey) => {
       if (!apiKey) {
@@ -282,11 +364,11 @@ function App() {
     loadHistoryFromStorage();
   }, []);
 
-  const saveHistoryItem = (item) => {
+  const saveHistoryItem = useCallback((item) => {
     if (item.data.id) {
       localStorage.setItem(item.data.id, JSON.stringify(item));
     }
-  };
+  }, []);
 
   const clearHistory = () => {
     for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -342,47 +424,8 @@ function App() {
     );
   };
 
-  const connectWebSocket = useCallback(() => {
-    if (!isApiKeyValid) {
-      return;
-    }
-
-    const apiKey = getApiKeyFromUrl();
-    if (!apiKey || !isValidApiKeyFormat(apiKey)) {
-      return;
-    }
-
-    if (socketRef.current) {
-      socketRef.current.close();
-    }
-
-    const WEBSOCKET_URL =
-      process.env.NODE_ENV === "production"
-        ? "wss://play-machine-server.noshado.ws/"
-        : "ws://localhost:3103/";
-
-    const ws = new WebSocket(WEBSOCKET_URL);
-    socketRef.current = ws;
-
-    ws.onopen = () => {
-      setConnected(true);
-      setRetryCount(0);
-      setSocket(ws);
-      ws.send(
-        JSON.stringify({
-          action: "getCurrentApp",
-          apiKey
-        })
-      );
-      ws.send(
-        JSON.stringify({
-          action: "getCurrentTheme",
-          apiKey
-        })
-      );
-    };
-
-    ws.onmessage = (event) => {
+  const handleWebSocketMessage = useCallback(
+    async (event) => {
       try {
         const data = JSON.parse(event.data);
         setSerialData(data);
@@ -450,11 +493,21 @@ function App() {
               if (!item.data.screenshots) {
                 item.data.screenshots = [];
               }
-              item.data.screenshots.push({
+
+              // Calculate the screenshot index
+              const screenshotIndex = item.data.screenshots.length + 1;
+
+              // Immediately add the base64 data so it shows up right away
+              const screenshotEntry = {
                 timestamp: new Date().toISOString(),
-                data: data.data
-              });
+                data: data.data, // Use the base64 data directly
+                isUploading: true
+              };
+
+              item.data.screenshots.push(screenshotEntry);
               item.data.screenshots = item.data.screenshots.slice(-6);
+
+              // Save to localStorage and update state immediately
               localStorage.setItem(itemId, JSON.stringify(item));
 
               setDataHistory((prevHistory) => {
@@ -468,6 +521,108 @@ function App() {
                 }
                 return prevHistory;
               });
+
+              uploadScreenshot(itemId, screenshotIndex, data.data)
+                .then((screenshotUrl) => {
+                  if (screenshotUrl) {
+                    // Get the current state and find the screenshot to update
+                    setDataHistory((prevHistory) => {
+                      const existingIndex = prevHistory.findIndex(
+                        (entry) => entry.data.id === itemId
+                      );
+
+                      if (existingIndex !== -1) {
+                        const updatedHistory = [...prevHistory];
+                        const updatedItem = {
+                          ...updatedHistory[existingIndex]
+                        };
+
+                        // Find the screenshot with the matching timestamp and update it
+                        if (updatedItem.data && updatedItem.data.screenshots) {
+                          const screenshotToUpdateIndex =
+                            updatedItem.data.screenshots.findIndex(
+                              (screenshot) =>
+                                screenshot.timestamp ===
+                                screenshotEntry.timestamp
+                            );
+
+                          if (screenshotToUpdateIndex !== -1) {
+                            updatedItem.data.screenshots = [
+                              ...updatedItem.data.screenshots
+                            ];
+                            updatedItem.data.screenshots[
+                              screenshotToUpdateIndex
+                            ] = {
+                              timestamp: screenshotEntry.timestamp,
+                              data: screenshotUrl,
+                              isUploading: false
+                            };
+
+                            // Update localStorage
+                            localStorage.setItem(
+                              itemId,
+                              JSON.stringify(updatedItem)
+                            );
+
+                            updatedHistory[existingIndex] = updatedItem;
+                            return updatedHistory;
+                          }
+                        }
+                      }
+
+                      return prevHistory;
+                    });
+                  } else {
+                    // Mark as not uploading but keep the base64 data
+                    setDataHistory((prevHistory) => {
+                      const existingIndex = prevHistory.findIndex(
+                        (entry) => entry.data.id === itemId
+                      );
+
+                      if (existingIndex !== -1) {
+                        const updatedHistory = [...prevHistory];
+                        const updatedItem = {
+                          ...updatedHistory[existingIndex]
+                        };
+
+                        if (updatedItem.data && updatedItem.data.screenshots) {
+                          const screenshotToUpdateIndex =
+                            updatedItem.data.screenshots.findIndex(
+                              (screenshot) =>
+                                screenshot.timestamp ===
+                                screenshotEntry.timestamp
+                            );
+
+                          if (screenshotToUpdateIndex !== -1) {
+                            updatedItem.data.screenshots = [
+                              ...updatedItem.data.screenshots
+                            ];
+                            updatedItem.data.screenshots[
+                              screenshotToUpdateIndex
+                            ].isUploading = false;
+
+                            // Update localStorage
+                            localStorage.setItem(
+                              itemId,
+                              JSON.stringify(updatedItem)
+                            );
+
+                            updatedHistory[existingIndex] = updatedItem;
+                            return updatedHistory;
+                          }
+                        }
+                      }
+                      return prevHistory;
+                    });
+                  }
+                })
+                .catch((error) => {
+                  console.error("screenshotData: upload promise rejected", {
+                    itemId,
+                    error: error.message,
+                    stack: error.stack
+                  });
+                });
             } catch (error) {
               console.error("Error updating screenshot data:", error);
             }
@@ -475,17 +630,32 @@ function App() {
         }
 
         if (!data.action || data.action === "serialData") {
-          const newEntry = {
-            data: {
-              ...data,
-              screenshots: []
-            },
-            timestamp: new Date().toISOString()
-          };
           setDataHistory((prevHistory) => {
             const existingIndex = prevHistory.findIndex(
               (entry) => entry.data.id === data.id
             );
+
+            let newEntry;
+            if (existingIndex !== -1) {
+              // Preserve existing screenshots when updating
+              const existingEntry = prevHistory[existingIndex];
+              newEntry = {
+                data: {
+                  ...data,
+                  screenshots: existingEntry.data.screenshots || []
+                },
+                timestamp: new Date().toISOString()
+              };
+            } else {
+              // New entry starts with empty screenshots
+              newEntry = {
+                data: {
+                  ...data,
+                  screenshots: []
+                },
+                timestamp: new Date().toISOString()
+              };
+            }
 
             let updatedHistory;
             if (existingIndex !== -1) {
@@ -505,7 +675,59 @@ function App() {
         setSerialData({ error: "Failed to parse data" });
         setLoading(false);
       }
+    },
+    [
+      uploadScreenshot,
+      setSerialData,
+      setCurrentTheme,
+      setCurrentApp,
+      setDataHistory,
+      setLoading,
+      saveHistoryItem
+    ]
+  );
+
+  const connectWebSocket = useCallback(() => {
+    if (!isApiKeyValid) {
+      return;
+    }
+
+    const apiKey = getApiKeyFromUrl();
+    if (!apiKey || !isValidApiKeyFormat(apiKey)) {
+      return;
+    }
+
+    if (socketRef.current) {
+      socketRef.current.close();
+    }
+
+    const WEBSOCKET_URL =
+      process.env.NODE_ENV === "production"
+        ? "wss://play-machine-server.noshado.ws/"
+        : "ws://localhost:3103/";
+
+    const ws = new WebSocket(WEBSOCKET_URL);
+    socketRef.current = ws;
+
+    ws.onopen = () => {
+      setConnected(true);
+      setRetryCount(0);
+      setSocket(ws);
+      ws.send(
+        JSON.stringify({
+          action: "getCurrentApp",
+          apiKey
+        })
+      );
+      ws.send(
+        JSON.stringify({
+          action: "getCurrentTheme",
+          apiKey
+        })
+      );
     };
+
+    ws.onmessage = handleWebSocketMessage;
 
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
@@ -531,11 +753,12 @@ function App() {
       }
     };
   }, [
+    isApiKeyValid,
+    isValidApiKeyFormat,
     retryCount,
     MAX_RETRIES,
     INITIAL_RETRY_DELAY,
-    isValidApiKeyFormat,
-    isApiKeyValid
+    handleWebSocketMessage
   ]);
 
   useEffect(() => {
@@ -755,20 +978,19 @@ function App() {
                           entry.data.screenshots.length > 0 && (
                             <AutoplayContainer>
                               {entry.data.screenshots.map(
-                                (screenshot, index) => (
-                                  <AutoplayImage
-                                    key={index}
-                                    src={`data:image/png;base64,${screenshot.data.replace(
-                                      /^data:image\/png;base64,/,
-                                      ""
-                                    )}`}
-                                    alt={`Screenshot ${index + 1}`}
-                                    $isVisible={
-                                      autoplayStates[entry.data.id]
-                                        ?.currentIndex === index
-                                    }
-                                  />
-                                )
+                                (screenshot, index) => {
+                                  const isVisible =
+                                    autoplayStates[entry.data.id]
+                                      ?.currentIndex === index;
+                                  return (
+                                    <AutoplayImage
+                                      key={index}
+                                      src={screenshot.data}
+                                      alt={`Screenshot ${index + 1}`}
+                                      $isVisible={isVisible}
+                                    />
+                                  );
+                                }
                               )}
                             </AutoplayContainer>
                           )}
