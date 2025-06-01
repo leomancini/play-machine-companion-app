@@ -9,16 +9,17 @@ import styled, { ThemeProvider } from "styled-components";
 import Button from "./components/Button";
 
 const Page = styled.div`
-  // display: flex;
-  // flex-direction: column;
-  // align-items: center;
-  // font-size: 1.5rem;
-  // color: ${(props) => props.theme.text};
-  // background-color: ${(props) => props.theme.background};
-  // font-family: ${(props) => props.theme.fontFamily};
-  // text-transform: ${(props) => props.theme.textTransform};
-  // box-sizing: border-box;
-  // height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 1.5rem;
+  color: ${(props) => props.theme.text};
+  background-color: ${(props) => props.theme.background};
+  font-family: ${(props) => props.theme.fontFamily};
+  text-transform: ${(props) => props.theme.textTransform};
+  box-sizing: border-box;
+  width: 100vw;
+  height: 100vh;
 `;
 
 const StatusIndicator = styled.div`
@@ -34,6 +35,7 @@ const AppPresetsContainer = styled.div`
   align-items: center;
   padding: 1rem;
   gap: 2.5rem;
+  width: calc(100% - 2rem);
 `;
 
 const AppNameHeader = styled.div`
@@ -534,10 +536,6 @@ function App() {
 
               // Check if this screenshot is already being uploaded
               if (uploadingScreenshots.current.has(screenshotKey)) {
-                console.log(
-                  "Screenshot already being processed, skipping duplicate:",
-                  screenshotKey
-                );
                 return;
               }
 
@@ -694,7 +692,6 @@ function App() {
 
           // Check if we've processed this preset ID very recently (within 2 seconds)
           if (recentPresetIds.current.has(recentKey)) {
-            console.log("Skipping duplicate preset data from server:", data.id);
             setLoading(false);
             loadingRef.current = false;
             return;
@@ -702,13 +699,6 @@ function App() {
 
           // Mark this preset ID as recently processed
           recentPresetIds.current.add(recentKey);
-
-          console.log(
-            "Processing preset data:",
-            data.id,
-            "at",
-            new Date().toISOString()
-          );
 
           // Clear the tracking after 2 seconds
           setTimeout(() => {
@@ -1030,7 +1020,6 @@ function App() {
         ) : (
           <>
             {!connected && <StatusIndicator>Disconnected</StatusIndicator>}
-
             {currentApp ? (
               <AppPresetsContainer>
                 <AppNameHeader>{formatAppName(currentApp)}</AppNameHeader>
