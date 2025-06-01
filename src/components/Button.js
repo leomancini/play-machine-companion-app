@@ -27,11 +27,7 @@ const StyledButton = styled.button`
       case "primary":
         return props.theme.accent;
       case "secondary":
-        return props.theme.menuSelectedBackground;
-      case "danger":
-        return "#dc3545";
-      case "clear":
-        return "#dc3545";
+        return "transparent";
       default:
         return props.theme.accent;
     }
@@ -41,11 +37,7 @@ const StyledButton = styled.button`
       case "primary":
         return props.theme.background;
       case "secondary":
-        return props.theme.menuSelectedText;
-      case "danger":
-        return "white";
-      case "clear":
-        return "white";
+        return props.theme.menuText;
       default:
         return props.theme.background;
     }

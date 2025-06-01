@@ -1070,7 +1070,7 @@ function App() {
                                   Load
                                 </Button>
                                 <Button
-                                  variant="danger"
+                                  variant="secondary"
                                   fullWidth
                                   onClick={() =>
                                     deletePresetItem(entry.data.id)
