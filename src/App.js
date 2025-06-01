@@ -438,11 +438,9 @@ function App() {
     loadingRef.current = true;
     setLoading(true);
 
-    const requestId = Date.now().toString();
     socket.send(
       JSON.stringify({
         action: "getSerialData",
-        requestId,
         apiKey
       })
     );
@@ -472,7 +470,6 @@ function App() {
     async (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("WebSocket event received:", data);
         setSerialData(data);
 
         if (data.action === "currentTheme") {
@@ -527,20 +524,12 @@ function App() {
 
         if (data.action === "screenshotData") {
           const itemId = data.data?.id || data.id;
-          console.log("Processing screenshotData for itemId:", itemId);
-          console.log(
-            "screenshotData structure - data.id:",
-            data.id,
-            "data.data?.id:",
-            data.data?.id
-          );
           if (!itemId) {
             console.error("No ID found in screenshot data");
             return;
           }
 
           const existingItem = localStorage.getItem(itemId);
-          console.log("Existing item found in localStorage:", !!existingItem);
 
           if (existingItem) {
             try {
@@ -549,20 +538,11 @@ function App() {
                 item.data.screenshots = [];
               }
 
-              console.log(
-                "Current screenshots count:",
-                item.data.screenshots.length
-              );
-
               // Create a unique key for this screenshot to prevent duplicates
               const screenshotKey = `${itemId}-${item.data.screenshots.length}`;
 
               // Check if this screenshot is already being uploaded
               if (uploadingScreenshots.current.has(screenshotKey)) {
-                console.log(
-                  "Screenshot already being processed, skipping duplicate:",
-                  screenshotKey
-                );
                 return;
               }
 
@@ -579,11 +559,6 @@ function App() {
               item.data.screenshots.push(screenshotEntry);
               item.data.screenshots = item.data.screenshots.slice(-6);
 
-              console.log(
-                "Updated screenshots count:",
-                item.data.screenshots.length
-              );
-
               // Save to localStorage and update state immediately
               localStorage.setItem(itemId, JSON.stringify(item));
 
@@ -591,7 +566,6 @@ function App() {
                 const existingIndex = prevPresets.findIndex(
                   (entry) => entry.data.id === itemId
                 );
-                console.log("Found existing preset index:", existingIndex);
                 if (existingIndex !== -1) {
                   const updatedPresets = [...prevPresets];
                   updatedPresets[existingIndex] = item;
@@ -728,7 +702,6 @@ function App() {
 
           // Check if we've processed this preset ID very recently (within 2 seconds)
           if (itemId && recentPresetIds.current.has(recentKey)) {
-            console.log("Skipping duplicate preset data from server:", itemId);
             setLoading(false);
             loadingRef.current = false;
             return;
@@ -738,13 +711,6 @@ function App() {
           if (itemId) {
             recentPresetIds.current.add(recentKey);
           }
-
-          console.log(
-            "Processing preset data:",
-            itemId || "no-id",
-            "at",
-            new Date().toISOString()
-          );
 
           // Clear the tracking after 2 seconds
           if (itemId) {
@@ -785,7 +751,6 @@ function App() {
             // Immediately save to localStorage so screenshotData can find it
             if (itemId) {
               localStorage.setItem(itemId, JSON.stringify(newEntry));
-              console.log("Saved preset to localStorage with ID:", itemId);
             }
 
             let updatedPresets;
