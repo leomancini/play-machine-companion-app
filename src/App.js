@@ -156,6 +156,8 @@ function App() {
   const [autoplayStates, setAutoplayStates] = useState({});
   const autoplayIntervals = useRef({});
   const uploadingScreenshots = useRef(new Map());
+  const loadingRef = useRef(false);
+  const recentPresetIds = useRef(new Set());
   const MAX_API_KEY_LENGTH = 256;
   const API_KEY_REGEX = useMemo(() => /^[a-zA-Z0-9]+$/, []);
 
@@ -417,7 +419,13 @@ function App() {
   };
 
   const requestSerialData = useCallback(() => {
-    if (!isApiKeyValid || !socket || !connected || loading) {
+    if (
+      !isApiKeyValid ||
+      !socket ||
+      !connected ||
+      loading ||
+      loadingRef.current
+    ) {
       return;
     }
 
@@ -426,11 +434,8 @@ function App() {
       return;
     }
 
-    // Additional safeguard: set loading immediately and check if already set
-    if (loading) {
-      return;
-    }
-
+    // Set both the ref and state to prevent race conditions
+    loadingRef.current = true;
     setLoading(true);
 
     socket.send(
@@ -693,6 +698,33 @@ function App() {
         }
 
         if (!data.action || data.action === "serialData") {
+          // Add deduplication check to prevent server-side duplicates
+          const presetKey = `${data.id}-${Date.now()}`;
+          const recentKey = `${data.id}-recent`;
+
+          // Check if we've processed this preset ID very recently (within 2 seconds)
+          if (recentPresetIds.current.has(recentKey)) {
+            console.log("Skipping duplicate preset data from server:", data.id);
+            setLoading(false);
+            loadingRef.current = false;
+            return;
+          }
+
+          // Mark this preset ID as recently processed
+          recentPresetIds.current.add(recentKey);
+
+          console.log(
+            "Processing preset data:",
+            data.id,
+            "at",
+            new Date().toISOString()
+          );
+
+          // Clear the tracking after 2 seconds
+          setTimeout(() => {
+            recentPresetIds.current.delete(recentKey);
+          }, 2000);
+
           setDataPresets((prevPresets) => {
             const existingIndex = prevPresets.findIndex(
               (entry) => entry.data.id === data.id
@@ -733,10 +765,12 @@ function App() {
           });
         }
         setLoading(false);
+        loadingRef.current = false;
       } catch (error) {
         console.error("Failed to parse message data:", error);
         setSerialData({ error: "Failed to parse data" });
         setLoading(false);
+        loadingRef.current = false;
       }
     },
     [
@@ -800,11 +834,13 @@ function App() {
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
       setLoading(false);
+      loadingRef.current = false;
     };
 
     ws.onclose = () => {
       setConnected(false);
       setLoading(false);
+      loadingRef.current = false;
       setSocket(null);
 
       if (socketRef.current === ws && retryCount < MAX_RETRIES) {
@@ -843,6 +879,10 @@ function App() {
       }
       // Clear any pending upload tracking using the captured ref value
       currentUploadingScreenshots.clear();
+      // Reset loading state
+      loadingRef.current = false;
+      // Clear recent preset tracking
+      recentPresetIds.current.clear();
     };
   }, [connectWebSocket]);
 
