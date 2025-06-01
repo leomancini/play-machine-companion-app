@@ -31,13 +31,9 @@ const ContentWrapper = styled.div`
 `;
 
 const StatusIndicator = styled.div`
-  padding: 0.3125rem 0.625rem;
+  padding: 0.5rem 1rem;
   font-size: 1rem;
-  background-color: ${(props) =>
-    props.$connected ? props.theme.accent : "#F44336"};
-  color: ${(props) => props.theme.menuSelectedText};
-  text-transform: ${(props) => props.theme.textTransform};
-  font-weight: bold;
+  color: rgba(0, 0, 0, 0.5);
   text-align: center;
 `;
 
@@ -46,7 +42,7 @@ const AppPresetsContainer = styled.div`
   flex-direction: column;
   align-items: center;
   padding: 1rem;
-  gap: 2rem;
+  gap: 2.5rem;
 `;
 
 const AppNameHeader = styled.div`
@@ -64,14 +60,6 @@ const NoAppMessage = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-`;
-
-const LoadingStepsContainer = styled.div`
-  font-size: 1.25rem;
-  padding: 1.25rem;
-  background-color: #f8f9fa;
-  text-align: center;
-  margin-bottom: 1.25rem;
 `;
 
 const PresetsList = styled.div`
@@ -94,6 +82,7 @@ const PresetItemHeader = styled.div`
   font-size: 1.25rem;
   font-weight: bold;
   margin-bottom: 0.5rem;
+  text-align: center;
 `;
 
 const ProgressBar = styled.div`
@@ -123,18 +112,6 @@ const AutoplayImage = styled.img`
   display: ${(props) => (props.$isVisible ? "block" : "none")};
 `;
 
-const ValidationMessage = styled.div`
-  font-size: 1.25rem;
-  padding: 1.25rem;
-  background-color: #f8f9fa;
-  text-align: center;
-`;
-
-const ErrorMessage = styled(ValidationMessage)`
-  color: #dc3545;
-`;
-
-// Theme configuration mapping
 const defaultTheme = {
   accent: "rgba(0, 102, 204, 1)",
   background: "#ffffff",
@@ -906,6 +883,13 @@ function App() {
     );
   }, [dataPresets, currentApp]);
 
+  // Check if any preset is currently being saved (has less than 6 screenshots)
+  const isAnyPresetBeingSaved = useMemo(() => {
+    return filteredPresets.some(
+      (entry) => entry.data.screenshots && entry.data.screenshots.length < 6
+    );
+  }, [filteredPresets]);
+
   const deletePresetItem = async (itemId) => {
     try {
       const apiKey = getApiKeyFromUrl();
@@ -967,32 +951,19 @@ function App() {
       <Page>
         <ContentWrapper>
           {!getApiKeyFromUrl() ? (
-            <ErrorMessage>
-              No API key provided. Please add an API key to the URL query
-              parameters.
-            </ErrorMessage>
+            <StatusIndicator>No API key</StatusIndicator>
           ) : !isApiKeyValid && !isValidatingApiKey ? (
-            <ErrorMessage>
-              Invalid API key. Please check your API key and try again.
-            </ErrorMessage>
+            <StatusIndicator>API key invalid</StatusIndicator>
           ) : !isInitializationComplete ? (
-            <LoadingStepsContainer>
-              {initializationStep === "validating" && (
-                <div>Validating API key...</div>
-              )}
-              {initializationStep === "connecting" && (
-                <div>Connecting to server...</div>
-              )}
-              {initializationStep === "themes" && <div>Loading themes...</div>}
-              {initializationStep === "app" && (
-                <div>Getting current app and theme...</div>
-              )}
-            </LoadingStepsContainer>
+            <StatusIndicator>
+              {initializationStep === "validating" && "Checking API key..."}
+              {initializationStep === "connecting" && "Connecting..."}
+              {initializationStep === "themes" && "Loading themes..."}
+              {initializationStep === "app" && "Getting current state..."}
+            </StatusIndicator>
           ) : (
             <>
-              <StatusIndicator $connected={connected}>
-                {connected ? "Connected" : "Disconnected"}
-              </StatusIndicator>
+              {!connected && <StatusIndicator>Disconnected</StatusIndicator>}
 
               {currentApp ? (
                 <AppPresetsContainer>
@@ -1001,9 +972,9 @@ function App() {
                     variant="primary"
                     fullWidth
                     onClick={requestSerialData}
-                    disabled={!connected || loading}
+                    disabled={!connected || loading || isAnyPresetBeingSaved}
                   >
-                    {loading ? "Loading..." : "Save Preset"}
+                    Save Preset
                   </Button>
                   {dataPresets.length > 0 && (
                     <PresetsList>
@@ -1086,7 +1057,7 @@ function App() {
                   )}
                 </AppPresetsContainer>
               ) : (
-                <NoAppMessage>Open an app to save a preset</NoAppMessage>
+                <NoAppMessage>Open app to save preset</NoAppMessage>
               )}
             </>
           )}

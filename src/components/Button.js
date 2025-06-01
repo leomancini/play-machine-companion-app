@@ -47,10 +47,30 @@ const StyledButton = styled.button`
   width: ${(props) => (props.$fullWidth ? "100%" : "auto")};
   font-family: ${(props) => props.theme.fontFamily};
   font-weight: bold;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-focus-ring-color: transparent;
+  user-select: none;
+
+  &:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
+  &:active {
+    outline: none;
+    box-shadow: none;
+    transform: none;
+    opacity: 0.75;
+  }
 
   &:disabled {
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.25;
   }
 `;
 
