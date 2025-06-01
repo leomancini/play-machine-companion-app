@@ -9,19 +9,16 @@ import styled, { ThemeProvider } from "styled-components";
 import Button from "./components/Button";
 
 const Page = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 1.5rem;
-  color: ${(props) => props.theme.text};
-  background-color: ${(props) => props.theme.background};
-  font-family: ${(props) => props.theme.fontFamily};
-  text-transform: ${(props) => props.theme.textTransform};
-  overflow-y: auto;
-  box-sizing: border-box;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+  // display: flex;
+  // flex-direction: column;
+  // align-items: center;
+  // font-size: 1.5rem;
+  // color: ${(props) => props.theme.text};
+  // background-color: ${(props) => props.theme.background};
+  // font-family: ${(props) => props.theme.fontFamily};
+  // text-transform: ${(props) => props.theme.textTransform};
+  // box-sizing: border-box;
+  // height: 100vh;
 `;
 
 const StatusIndicator = styled.div`
