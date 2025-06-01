@@ -416,8 +416,8 @@ function App() {
     setDataPresets([]);
   };
 
-  const requestSerialData = () => {
-    if (!isApiKeyValid || !socket || !connected) {
+  const requestSerialData = useCallback(() => {
+    if (!isApiKeyValid || !socket || !connected || loading) {
       return;
     }
 
@@ -426,15 +426,21 @@ function App() {
       return;
     }
 
+    // Additional safeguard: set loading immediately and check if already set
+    if (loading) {
+      return;
+    }
+
+    setLoading(true);
+
     socket.send(
       JSON.stringify({
         action: "getSerialData",
         apiKey
       })
     );
-    setLoading(true);
     setSerialData(null);
-  };
+  }, [isApiKeyValid, socket, connected, loading, isValidApiKeyFormat]);
 
   const sendSerialData = (data) => {
     if (!isApiKeyValid || !socket || !connected) {
@@ -998,6 +1004,17 @@ function App() {
               {currentApp ? (
                 <AppPresetsContainer>
                   <AppNameHeader>{formatAppName(currentApp)}</AppNameHeader>
+                  <StatusIndicator>
+                    {connected ? "Connected" : "Disconnected"}
+                  </StatusIndicator>
+
+                  <StatusIndicator>
+                    {loading ? "Loading..." : "Ready"}
+                  </StatusIndicator>
+
+                  <StatusIndicator>
+                    {isAnyPresetBeingSaved ? "Saving..." : "Ready"}
+                  </StatusIndicator>
                   <Button
                     variant="primary"
                     fullWidth
