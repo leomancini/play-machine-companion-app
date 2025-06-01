@@ -1046,17 +1046,6 @@ function App() {
               {currentApp ? (
                 <AppPresetsContainer>
                   <AppNameHeader>{formatAppName(currentApp)}</AppNameHeader>
-                  <StatusIndicator>
-                    {connected ? "Connected" : "Disconnected"}
-                  </StatusIndicator>
-
-                  <StatusIndicator>
-                    {loading ? "Loading..." : "Ready"}
-                  </StatusIndicator>
-
-                  <StatusIndicator>
-                    {isAnyPresetBeingSaved ? "Saving..." : "Ready"}
-                  </StatusIndicator>
                   <Button
                     variant="primary"
                     fullWidth
