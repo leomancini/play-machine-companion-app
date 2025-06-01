@@ -155,6 +155,7 @@ function App() {
   const socketRef = useRef(null);
   const [autoplayStates, setAutoplayStates] = useState({});
   const autoplayIntervals = useRef({});
+  const uploadingScreenshots = useRef(new Map());
   const MAX_API_KEY_LENGTH = 256;
   const API_KEY_REGEX = useMemo(() => /^[a-zA-Z0-9]+$/, []);
 
@@ -526,6 +527,18 @@ function App() {
                 item.data.screenshots = [];
               }
 
+              // Create a unique key for this screenshot to prevent duplicates
+              const screenshotKey = `${itemId}-${item.data.screenshots.length}`;
+
+              // Check if this screenshot is already being uploaded
+              if (uploadingScreenshots.current.has(screenshotKey)) {
+                console.log(
+                  "Screenshot already being processed, skipping duplicate:",
+                  screenshotKey
+                );
+                return;
+              }
+
               // Calculate the screenshot index
               const screenshotIndex = item.data.screenshots.length + 1;
 
@@ -554,7 +567,12 @@ function App() {
                 return prevPresets;
               });
 
-              uploadScreenshot(itemId, screenshotIndex, data.data)
+              // Mark as being uploaded to prevent duplicates
+              const uploadPromise = uploadScreenshot(
+                itemId,
+                screenshotIndex,
+                data.data
+              )
                 .then((screenshotUrl) => {
                   if (screenshotUrl) {
                     // Get the current state and find the screenshot to update
@@ -654,7 +672,14 @@ function App() {
                     error: error.message,
                     stack: error.stack
                   });
+                })
+                .finally(() => {
+                  // Clean up the tracking entry when upload completes
+                  uploadingScreenshots.current.delete(screenshotKey);
                 });
+
+              // Store the promise to track this upload
+              uploadingScreenshots.current.set(screenshotKey, uploadPromise);
             } catch (error) {
               console.error("Error updating screenshot data:", error);
             }
@@ -802,11 +827,16 @@ function App() {
   useEffect(() => {
     connectWebSocket();
 
+    // Capture the current ref value to use in cleanup
+    const currentUploadingScreenshots = uploadingScreenshots.current;
+
     return () => {
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
       }
+      // Clear any pending upload tracking using the captured ref value
+      currentUploadingScreenshots.clear();
     };
   }, [connectWebSocket]);
 
