@@ -18,7 +18,6 @@ const Page = styled.div`
   background-color: ${(props) => props.theme.background};
   font-family: ${(props) => props.theme.fontFamily};
   text-transform: ${(props) => props.theme.textTransform};
-  padding: 1.25rem;
   overflow-y: auto;
   box-sizing: border-box;
 `;
@@ -26,57 +25,82 @@ const Page = styled.div`
 const ContentWrapper = styled.div`
   width: 100%;
   max-width: 50rem;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: 1.25rem 0;
 `;
 
 const StatusIndicator = styled.div`
   padding: 0.3125rem 0.625rem;
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
-  margin-bottom: 1.25rem;
-  background-color: ${(props) => (props.$connected ? "#4CAF50" : "#F44336")};
-  color: white;
+  font-size: 1rem;
+  background-color: ${(props) =>
+    props.$connected ? props.theme.accent : "#F44336"};
+  color: ${(props) => props.theme.menuSelectedText};
+  text-transform: ${(props) => props.theme.textTransform};
+  font-weight: bold;
+  text-align: center;
 `;
 
-const HistoryList = styled.div`
-  width: 100%;
-  max-width: 50rem;
-
-  ul {
-    list-style: none;
-    padding: 0;
-  }
-
-  li {
-    width: 100%;
-    margin-bottom: 1rem;
-  }
-`;
-
-const HistoryItem = styled.div`
-  background: ${(props) => props.theme.menuBackground};
-  border: 0.0625rem solid ${(props) => props.theme.border};
-  border-radius: 0.5rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
-  padding: 0.9375rem;
+const AppPresetsContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  align-items: center;
+  padding: 1rem;
+  gap: 2rem;
+`;
+
+const AppNameHeader = styled.div`
+  font-size: 1.75rem;
+  margin-top: 1rem;
+  padding: 0.5rem;
+  text-align: center;
+  font-weight: bold;
+`;
+
+const NoAppMessage = styled.div`
+  font-weight: normal;
+  font-size: 1.25rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const LoadingStepsContainer = styled.div`
+  font-size: 1.25rem;
+  padding: 1.25rem;
+  background-color: #f8f9fa;
+  text-align: center;
+  margin-bottom: 1.25rem;
+`;
+
+const PresetsList = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+`;
+
+const PresetItem = styled.div`
+  background: ${(props) => props.theme.background};
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   color: ${(props) => props.theme.text};
   font-family: ${(props) => props.theme.fontFamily};
+`;
+
+const PresetItemHeader = styled.div`
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
 `;
 
 const ProgressBar = styled.div`
   width: 100%;
   height: 0.5rem;
   background-color: ${(props) => props.theme.background};
-  border: 0.0625rem solid ${(props) => props.theme.border};
-  border-radius: 0.25rem;
   overflow: hidden;
-  margin: 0.3125rem 0;
 `;
 
 const ProgressFill = styled.div`
@@ -89,9 +113,7 @@ const ProgressFill = styled.div`
 const AutoplayContainer = styled.div`
   position: relative;
   width: 100%;
-  margin: 0.625rem 0;
   background: #000;
-  border-radius: 0.25rem;
   overflow: hidden;
 `;
 
@@ -101,56 +123,15 @@ const AutoplayImage = styled.img`
   display: ${(props) => (props.$isVisible ? "block" : "none")};
 `;
 
-const HistoryHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.625rem;
-`;
-
 const ValidationMessage = styled.div`
   font-size: 1.25rem;
   padding: 1.25rem;
   background-color: #f8f9fa;
-  border-radius: 0.25rem;
   text-align: center;
 `;
 
 const ErrorMessage = styled(ValidationMessage)`
   color: #dc3545;
-`;
-
-const AppStatusContainer = styled.div`
-  font-size: 1.25rem;
-  margin-bottom: 1.25rem;
-  padding: 0.625rem;
-  border-radius: 0.25rem;
-  text-align: center;
-`;
-
-const NoAppMessage = styled(AppStatusContainer)`
-  color: #666;
-`;
-
-const ThemeStatusContainer = styled.div`
-  font-size: 1.25rem;
-  margin-bottom: 1.25rem;
-  padding: 0.625rem;
-  border-radius: 0.25rem;
-  text-align: center;
-`;
-
-const HistoryTitle = styled.h3`
-  margin: 0;
-`;
-
-const LoadingStepsContainer = styled.div`
-  font-size: 1.25rem;
-  padding: 1.25rem;
-  background-color: #f8f9fa;
-  border-radius: 0.25rem;
-  text-align: center;
-  margin-bottom: 1.25rem;
 `;
 
 // Theme configuration mapping
@@ -167,13 +148,22 @@ const defaultTheme = {
   textTransform: "none"
 };
 
+// Utility function to format camelCase strings with spaces
+const formatAppName = (appName) => {
+  if (!appName || typeof appName !== "string") return appName;
+  return appName
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
+};
+
 function App() {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [, setSerialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [dataHistory, setDataHistory] = useState([]);
+  const [dataPresets, setDataPresets] = useState([]);
   const [currentApp, setCurrentApp] = useState(null);
   const [currentTheme, setCurrentTheme] = useState(null);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
@@ -204,6 +194,24 @@ function App() {
     }
     return defaultTheme;
   }, [currentTheme, themes]);
+
+  // Update CSS custom properties when theme changes
+  useEffect(() => {
+    if (currentThemeObject) {
+      document.documentElement.style.setProperty(
+        "--theme-background",
+        currentThemeObject.background
+      );
+      document.documentElement.style.setProperty(
+        "--theme-text",
+        currentThemeObject.text
+      );
+      document.documentElement.style.setProperty(
+        "--theme-accent",
+        currentThemeObject.accent
+      );
+    }
+  }, [currentThemeObject]);
 
   const isValidApiKeyFormat = useCallback(
     (apiKey) => {
@@ -388,35 +396,34 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const loadHistoryFromStorage = () => {
-      const historyItems = [];
+    const loadPresetsFromStorage = () => {
+      const presetItems = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         try {
           const item = JSON.parse(localStorage.getItem(key));
           if (item.data && item.data.id) {
-            historyItems.push(item);
+            presetItems.push(item);
           }
         } catch (error) {
-          console.error("Error parsing history item:", error);
+          console.error("Error parsing preset item:", error);
         }
       }
-      historyItems.sort(
-        (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-      );
-      setDataHistory(historyItems.slice(0, 10));
+      presetItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      setDataPresets(presetItems.slice(0, 10));
     };
 
-    loadHistoryFromStorage();
+    loadPresetsFromStorage();
   }, []);
 
-  const saveHistoryItem = useCallback((item) => {
+  const savePresetsItem = useCallback((item) => {
     if (item.data.id) {
       localStorage.setItem(item.data.id, JSON.stringify(item));
     }
   }, []);
 
-  const clearHistory = () => {
+  // eslint-disable-next-line no-unused-vars
+  const clearPresets = () => {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
       try {
@@ -425,10 +432,10 @@ function App() {
           localStorage.removeItem(key);
         }
       } catch (error) {
-        console.error("Error parsing history item:", error);
+        console.error("Error parsing preset item:", error);
       }
     }
-    setDataHistory([]);
+    setDataPresets([]);
   };
 
   const requestSerialData = () => {
@@ -451,7 +458,7 @@ function App() {
     setSerialData(null);
   };
 
-  const resendSerialData = (data) => {
+  const sendSerialData = (data) => {
     if (!isApiKeyValid || !socket || !connected) {
       return;
     }
@@ -484,45 +491,45 @@ function App() {
         if (data.action === "currentApp") {
           setCurrentApp(data.data.appId);
           setHasReceivedApp(true);
-          const historyItems = [];
+          const presetItems = [];
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             try {
               const item = JSON.parse(localStorage.getItem(key));
               if (item.data?.data?.currentApp === data.data.appId) {
-                historyItems.push(item);
+                presetItems.push(item);
               }
             } catch (error) {
-              console.error("Error parsing history item:", error);
+              console.error("Error parsing preset item:", error);
             }
           }
-          historyItems.sort(
+          presetItems.sort(
             (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
           );
-          setDataHistory(historyItems.slice(0, 10));
+          setDataPresets(presetItems.slice(0, 10));
         }
 
         if (data.action === "appChanged") {
           setCurrentApp(data.data.appId);
           if (data.data.appId === null) {
-            setDataHistory([]);
+            setDataPresets([]);
           } else {
-            const historyItems = [];
+            const presetItems = [];
             for (let i = 0; i < localStorage.length; i++) {
               const key = localStorage.key(i);
               try {
                 const item = JSON.parse(localStorage.getItem(key));
                 if (item.data?.data?.currentApp === data.data.appId) {
-                  historyItems.push(item);
+                  presetItems.push(item);
                 }
               } catch (error) {
-                console.error("Error parsing history item:", error);
+                console.error("Error parsing preset item:", error);
               }
             }
-            historyItems.sort(
+            presetItems.sort(
               (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
             );
-            setDataHistory(historyItems.slice(0, 10));
+            setDataPresets(presetItems.slice(0, 10));
           }
         }
 
@@ -558,31 +565,31 @@ function App() {
               // Save to localStorage and update state immediately
               localStorage.setItem(itemId, JSON.stringify(item));
 
-              setDataHistory((prevHistory) => {
-                const existingIndex = prevHistory.findIndex(
+              setDataPresets((prevPresets) => {
+                const existingIndex = prevPresets.findIndex(
                   (entry) => entry.data.id === itemId
                 );
                 if (existingIndex !== -1) {
-                  const updatedHistory = [...prevHistory];
-                  updatedHistory[existingIndex] = item;
-                  return updatedHistory;
+                  const updatedPresets = [...prevPresets];
+                  updatedPresets[existingIndex] = item;
+                  return updatedPresets;
                 }
-                return prevHistory;
+                return prevPresets;
               });
 
               uploadScreenshot(itemId, screenshotIndex, data.data)
                 .then((screenshotUrl) => {
                   if (screenshotUrl) {
                     // Get the current state and find the screenshot to update
-                    setDataHistory((prevHistory) => {
-                      const existingIndex = prevHistory.findIndex(
+                    setDataPresets((prevPresets) => {
+                      const existingIndex = prevPresets.findIndex(
                         (entry) => entry.data.id === itemId
                       );
 
                       if (existingIndex !== -1) {
-                        const updatedHistory = [...prevHistory];
+                        const updatedPresets = [...prevPresets];
                         const updatedItem = {
-                          ...updatedHistory[existingIndex]
+                          ...updatedPresets[existingIndex]
                         };
 
                         // Find the screenshot with the matching timestamp and update it
@@ -612,25 +619,25 @@ function App() {
                               JSON.stringify(updatedItem)
                             );
 
-                            updatedHistory[existingIndex] = updatedItem;
-                            return updatedHistory;
+                            updatedPresets[existingIndex] = updatedItem;
+                            return updatedPresets;
                           }
                         }
                       }
 
-                      return prevHistory;
+                      return prevPresets;
                     });
                   } else {
                     // Mark as not uploading but keep the base64 data
-                    setDataHistory((prevHistory) => {
-                      const existingIndex = prevHistory.findIndex(
+                    setDataPresets((prevPresets) => {
+                      const existingIndex = prevPresets.findIndex(
                         (entry) => entry.data.id === itemId
                       );
 
                       if (existingIndex !== -1) {
-                        const updatedHistory = [...prevHistory];
+                        const updatedPresets = [...prevPresets];
                         const updatedItem = {
-                          ...updatedHistory[existingIndex]
+                          ...updatedPresets[existingIndex]
                         };
 
                         if (updatedItem.data && updatedItem.data.screenshots) {
@@ -655,12 +662,12 @@ function App() {
                               JSON.stringify(updatedItem)
                             );
 
-                            updatedHistory[existingIndex] = updatedItem;
-                            return updatedHistory;
+                            updatedPresets[existingIndex] = updatedItem;
+                            return updatedPresets;
                           }
                         }
                       }
-                      return prevHistory;
+                      return prevPresets;
                     });
                   }
                 })
@@ -678,15 +685,15 @@ function App() {
         }
 
         if (!data.action || data.action === "serialData") {
-          setDataHistory((prevHistory) => {
-            const existingIndex = prevHistory.findIndex(
+          setDataPresets((prevPresets) => {
+            const existingIndex = prevPresets.findIndex(
               (entry) => entry.data.id === data.id
             );
 
             let newEntry;
             if (existingIndex !== -1) {
               // Preserve existing screenshots when updating
-              const existingEntry = prevHistory[existingIndex];
+              const existingEntry = prevPresets[existingIndex];
               newEntry = {
                 data: {
                   ...data,
@@ -705,16 +712,16 @@ function App() {
               };
             }
 
-            let updatedHistory;
+            let updatedPresets;
             if (existingIndex !== -1) {
-              updatedHistory = [...prevHistory];
-              updatedHistory[existingIndex] = newEntry;
+              updatedPresets = [...prevPresets];
+              updatedPresets[existingIndex] = newEntry;
             } else {
-              updatedHistory = [newEntry, ...prevHistory].slice(0, 10);
+              updatedPresets = [newEntry, ...prevPresets].slice(0, 10);
             }
 
-            saveHistoryItem(newEntry);
-            return updatedHistory;
+            savePresetsItem(newEntry);
+            return updatedPresets;
           });
         }
         setLoading(false);
@@ -729,9 +736,9 @@ function App() {
       setSerialData,
       setCurrentTheme,
       setCurrentApp,
-      setDataHistory,
+      setDataPresets,
       setLoading,
-      saveHistoryItem
+      savePresetsItem
     ]
   );
 
@@ -882,7 +889,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    dataHistory.forEach((entry) => {
+    dataPresets.forEach((entry) => {
       if (entry.data.screenshots && entry.data.screenshots.length > 0) {
         if (entry.data.screenshots.length === 6) {
           startAutoplay(entry.data.id, entry.data.screenshots);
@@ -891,15 +898,15 @@ function App() {
         }
       }
     });
-  }, [dataHistory, startAutoplay]);
+  }, [dataPresets, startAutoplay]);
 
-  const filteredHistory = useMemo(() => {
-    return dataHistory.filter(
+  const filteredPresets = useMemo(() => {
+    return dataPresets.filter(
       (entry) => entry?.data?.data?.currentApp === currentApp
     );
-  }, [dataHistory, currentApp]);
+  }, [dataPresets, currentApp]);
 
-  const deleteHistoryItem = async (itemId) => {
+  const deletePresetItem = async (itemId) => {
     try {
       const apiKey = getApiKeyFromUrl();
       if (apiKey && isValidApiKeyFormat(apiKey)) {
@@ -927,8 +934,8 @@ function App() {
     // Remove from localStorage and update local state regardless of API call result
     localStorage.removeItem(itemId);
 
-    setDataHistory((prevHistory) =>
-      prevHistory.filter((entry) => entry.data.id !== itemId)
+    setDataPresets((prevPresets) =>
+      prevPresets.filter((entry) => entry.data.id !== itemId)
     );
   };
 
@@ -988,52 +995,39 @@ function App() {
               </StatusIndicator>
 
               {currentApp ? (
-                <AppStatusContainer>
-                  Current App: {currentApp}
-                </AppStatusContainer>
-              ) : (
-                <NoAppMessage>No app open</NoAppMessage>
-              )}
-
-              {currentTheme && (
-                <ThemeStatusContainer>
-                  Current Theme: {currentTheme}
-                </ThemeStatusContainer>
-              )}
-
-              <Button
-                variant="primary"
-                fullWidth
-                onClick={requestSerialData}
-                disabled={!connected || loading}
-              >
-                {loading ? "Loading..." : "Request Current Serial Data"}
-              </Button>
-
-              {dataHistory.length > 0 && (
-                <HistoryList>
-                  <HistoryHeader>
-                    <HistoryTitle>History:</HistoryTitle>
-                    <Button variant="clear" size="small" onClick={clearHistory}>
-                      Clear History
-                    </Button>
-                  </HistoryHeader>
-                  <ul>
-                    {filteredHistory.map((entry, index) => (
-                      <li key={entry.timestamp}>
-                        <HistoryItem>
-                          <div>
-                            {new Date(entry.timestamp).toLocaleString()}
-                          </div>
-                          {entry.data.screenshots && (
-                            <>
-                              <ProgressBar>
-                                <ProgressFill
-                                  $progress={entry.data.screenshots.length}
-                                />
-                              </ProgressBar>
-                            </>
-                          )}
+                <AppPresetsContainer>
+                  <AppNameHeader>{formatAppName(currentApp)}</AppNameHeader>
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    onClick={requestSerialData}
+                    disabled={!connected || loading}
+                  >
+                    {loading ? "Loading..." : "Save Preset"}
+                  </Button>
+                  {dataPresets.length > 0 && (
+                    <PresetsList>
+                      {filteredPresets.map((entry, index) => (
+                        <PresetItem key={entry.timestamp}>
+                          <PresetItemHeader>
+                            {new Date(entry.timestamp).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric"
+                              }
+                            ) +
+                              " at " +
+                              new Date(entry.timestamp).toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                  hour12: true
+                                }
+                              )}
+                          </PresetItemHeader>
                           {entry.data.screenshots &&
                             entry.data.screenshots.length > 0 && (
                               <AutoplayContainer>
@@ -1054,34 +1048,45 @@ function App() {
                                 )}
                               </AutoplayContainer>
                             )}
-                          <Button
-                            variant="secondary"
-                            fullWidth
-                            onClick={() => resendSerialData(entry.data)}
-                            disabled={
-                              !connected ||
-                              !entry.data.screenshots ||
-                              entry.data.screenshots.length < 6
-                            }
-                          >
-                            Send
-                          </Button>
-                          <Button
-                            variant="danger"
-                            fullWidth
-                            onClick={() => deleteHistoryItem(entry.data.id)}
-                            disabled={
-                              !entry.data.screenshots ||
-                              entry.data.screenshots.length < 6
-                            }
-                          >
-                            Delete
-                          </Button>
-                        </HistoryItem>
-                      </li>
-                    ))}
-                  </ul>
-                </HistoryList>
+                          {entry.data.screenshots.length < 6 &&
+                            entry.data.screenshots && (
+                              <>
+                                <ProgressBar>
+                                  <ProgressFill
+                                    $progress={entry.data.screenshots.length}
+                                  />
+                                </ProgressBar>
+                              </>
+                            )}
+                          {entry.data.screenshots &&
+                            entry.data.screenshots.length >= 6 && (
+                              <>
+                                <Button
+                                  variant="primary"
+                                  fullWidth
+                                  onClick={() => sendSerialData(entry.data)}
+                                  disabled={!connected}
+                                >
+                                  Load
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  fullWidth
+                                  onClick={() =>
+                                    deletePresetItem(entry.data.id)
+                                  }
+                                >
+                                  Delete
+                                </Button>
+                              </>
+                            )}
+                        </PresetItem>
+                      ))}
+                    </PresetsList>
+                  )}
+                </AppPresetsContainer>
+              ) : (
+                <NoAppMessage>Open an app to save a preset</NoAppMessage>
               )}
             </>
           )}

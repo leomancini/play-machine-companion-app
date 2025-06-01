@@ -7,9 +7,9 @@ const StyledButton = styled.button`
       case "small":
         return "0.5rem 1rem";
       case "large":
-        return "0.75rem 1.5rem";
+        return "1rem 2rem";
       default:
-        return "0.75rem 1.5rem";
+        return "1rem 2rem";
     }
   }};
   font-size: ${(props) => {
@@ -17,9 +17,9 @@ const StyledButton = styled.button`
       case "small":
         return "0.875rem";
       case "large":
-        return "1.125rem";
+        return "1.25rem";
       default:
-        return "1.125rem";
+        return "1.25rem";
     }
   }};
   background-color: ${(props) => {
@@ -50,37 +50,13 @@ const StyledButton = styled.button`
         return props.theme.background;
     }
   }};
-  border: ${(props) => {
-    switch (props.$variant) {
-      case "clear":
-        return "none";
-      default:
-        return `0.0625rem solid ${props.theme.border}`;
-    }
-  }};
-  border-radius: 0.25rem;
+  border: none;
   cursor: pointer;
   width: ${(props) => (props.$fullWidth ? "100%" : "auto")};
   font-family: ${(props) => props.theme.fontFamily};
-  text-transform: ${(props) => props.theme.textTransform};
-  transition: all 0.2s ease;
-
-  &:hover:not(:disabled) {
-    opacity: 0.8;
-    ${(props) => {
-      switch (props.$variant) {
-        case "danger":
-          return "background-color: #c82333;";
-        case "clear":
-          return "background-color: #c82333;";
-        default:
-          return "";
-      }
-    }}
-  }
+  font-weight: bold;
 
   &:disabled {
-    background-color: #cccccc;
     cursor: not-allowed;
     opacity: 0.6;
   }

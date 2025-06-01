@@ -12,3 +12,6 @@ code {
     monospace;
 }
 
+html {
+  background-color: var(--theme-background, #ffffff);
+}
