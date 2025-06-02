@@ -107,12 +107,12 @@ const AutoplayImage = styled.img`
 `;
 
 const defaultTheme = {
-  accent: "rgba(0, 102, 204, 1)",
+  accent: "rgba(0, 0, 0, 1)",
   background: "#ffffff",
-  border: "rgba(0, 102, 204, 0.3)",
+  border: "rgba(0, 0, 0, 0.3)",
   fontFamily: "system-ui, -apple-system, sans-serif",
-  menuBackground: "#f8f9fa",
-  menuSelectedBackground: "rgba(0, 102, 204, 1)",
+  menuBackground: "#000000",
+  menuSelectedBackground: "rgba(0, 0, 0, 1)",
   menuSelectedText: "#ffffff",
   menuText: "#333333",
   text: "#333333",
@@ -144,6 +144,7 @@ function App() {
   const [initializationStep, setInitializationStep] = useState("validating"); // validating, connecting, themes, app, ready
   const [hasReceivedTheme, setHasReceivedTheme] = useState(false);
   const [hasReceivedApp, setHasReceivedApp] = useState(false);
+  const [cannotConnect, setCannotConnect] = useState(false);
   const MAX_RETRIES = 5;
   const INITIAL_RETRY_DELAY = 1000;
   const socketRef = useRef(null);
@@ -152,6 +153,7 @@ function App() {
   const uploadingScreenshots = useRef(new Map());
   const loadingRef = useRef(false);
   const recentPresetIds = useRef(new Set());
+  const currentStateTimeoutRef = useRef(null);
   const MAX_API_KEY_LENGTH = 256;
   const API_KEY_REGEX = useMemo(() => /^[a-zA-Z0-9]+$/, []);
 
@@ -999,8 +1001,35 @@ function App() {
   useEffect(() => {
     if (hasReceivedTheme && hasReceivedApp && initializationStep === "app") {
       setInitializationStep("ready");
+      // Clear timeout since we received everything
+      if (currentStateTimeoutRef.current) {
+        clearTimeout(currentStateTimeoutRef.current);
+        currentStateTimeoutRef.current = null;
+      }
     }
   }, [hasReceivedTheme, hasReceivedApp, initializationStep]);
+
+  // Start timeout when we enter the "app" step
+  useEffect(() => {
+    if (initializationStep === "app") {
+      // Clear any existing timeout
+      if (currentStateTimeoutRef.current) {
+        clearTimeout(currentStateTimeoutRef.current);
+      }
+
+      // Set timeout for 5 seconds
+      currentStateTimeoutRef.current = setTimeout(() => {
+        setCannotConnect(true);
+      }, 5000);
+    }
+
+    return () => {
+      if (currentStateTimeoutRef.current) {
+        clearTimeout(currentStateTimeoutRef.current);
+        currentStateTimeoutRef.current = null;
+      }
+    };
+  }, [initializationStep]);
 
   // Also check if we should transition to ready state based on available data
   useEffect(() => {
@@ -1013,6 +1042,11 @@ function App() {
       hasReceivedApp
     ) {
       setInitializationStep("ready");
+      // Clear timeout since we received everything
+      if (currentStateTimeoutRef.current) {
+        clearTimeout(currentStateTimeoutRef.current);
+        currentStateTimeoutRef.current = null;
+      }
     }
   }, [connected, isLoadingThemes, themes, hasReceivedTheme, hasReceivedApp]);
 
@@ -1024,13 +1058,29 @@ function App() {
         {!getApiKeyFromUrl() ? (
           <StatusIndicator>No API key</StatusIndicator>
         ) : !isApiKeyValid && !isValidatingApiKey ? (
-          <StatusIndicator>API key invalid</StatusIndicator>
+          <StatusIndicator>Invalid API key</StatusIndicator>
         ) : !isInitializationComplete ? (
           <StatusIndicator>
             {initializationStep === "validating" && "Checking API key..."}
-            {initializationStep === "connecting" && "Connecting..."}
-            {initializationStep === "themes" && "Loading themes..."}
-            {initializationStep === "app" && "Getting current state..."}
+            {initializationStep === "connecting" && "Connecting to server..."}
+            {initializationStep === "themes" && "Downloading themes..."}
+            {initializationStep === "app" &&
+              (cannotConnect ? (
+                <>
+                  Can't connect to Play Machine
+                  <br />
+                  <Button
+                    variant="primary"
+                    size="small"
+                    onClick={() => window.location.reload()}
+                    style={{ marginTop: "1rem" }}
+                  >
+                    Retry
+                  </Button>
+                </>
+              ) : (
+                "Connecting to Play Machine..."
+              ))}
           </StatusIndicator>
         ) : (
           <>
