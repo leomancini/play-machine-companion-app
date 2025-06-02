@@ -22,14 +22,6 @@ const Page = styled.div`
   box-sizing: border-box;
 `;
 
-const ContentWrapper = styled.div`
-  width: 100%;
-  max-width: 50rem;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-`;
-
 const StatusIndicator = styled.div`
   padding: 0.5rem 1rem;
   font-size: 1rem;
@@ -43,6 +35,8 @@ const AppPresetsContainer = styled.div`
   align-items: center;
   padding: 1rem;
   gap: 2.5rem;
+  width: calc(100% - 2rem);
+  max-width: 40rem;
 `;
 
 const AppNameHeader = styled.div`
@@ -56,10 +50,10 @@ const AppNameHeader = styled.div`
 const NoAppMessage = styled.div`
   font-weight: normal;
   font-size: 1.25rem;
-  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 100vh;
 `;
 
 const PresetsList = styled.div`
@@ -1027,119 +1021,114 @@ function App() {
   return (
     <ThemeProvider theme={currentThemeObject}>
       <Page>
-        <ContentWrapper>
-          {!getApiKeyFromUrl() ? (
-            <StatusIndicator>No API key</StatusIndicator>
-          ) : !isApiKeyValid && !isValidatingApiKey ? (
-            <StatusIndicator>API key invalid</StatusIndicator>
-          ) : !isInitializationComplete ? (
-            <StatusIndicator>
-              {initializationStep === "validating" && "Checking API key..."}
-              {initializationStep === "connecting" && "Connecting..."}
-              {initializationStep === "themes" && "Loading themes..."}
-              {initializationStep === "app" && "Getting current state..."}
-            </StatusIndicator>
-          ) : (
-            <>
-              {!connected && <StatusIndicator>Disconnected</StatusIndicator>}
-
-              {currentApp ? (
-                <AppPresetsContainer>
-                  <AppNameHeader>{formatAppName(currentApp)}</AppNameHeader>
-                  <Button
-                    variant="primary"
-                    fullWidth
-                    onClick={requestSerialData}
-                    disabled={!connected || loading || isAnyPresetBeingSaved}
-                  >
-                    Save Preset
-                  </Button>
-                  {dataPresets.length > 0 && (
-                    <PresetsList>
-                      {filteredPresets.map((entry, index) => (
-                        <PresetItem key={entry.timestamp}>
-                          <PresetItemHeader>
-                            {new Date(entry.timestamp).toLocaleDateString(
+        {!getApiKeyFromUrl() ? (
+          <StatusIndicator>No API key</StatusIndicator>
+        ) : !isApiKeyValid && !isValidatingApiKey ? (
+          <StatusIndicator>API key invalid</StatusIndicator>
+        ) : !isInitializationComplete ? (
+          <StatusIndicator>
+            {initializationStep === "validating" && "Checking API key..."}
+            {initializationStep === "connecting" && "Connecting..."}
+            {initializationStep === "themes" && "Loading themes..."}
+            {initializationStep === "app" && "Getting current state..."}
+          </StatusIndicator>
+        ) : (
+          <>
+            {!connected && <StatusIndicator>Disconnected</StatusIndicator>}
+            {currentApp ? (
+              <AppPresetsContainer>
+                <AppNameHeader>{formatAppName(currentApp)}</AppNameHeader>
+                <Button
+                  variant="primary"
+                  fullWidth
+                  onClick={requestSerialData}
+                  disabled={!connected || loading || isAnyPresetBeingSaved}
+                >
+                  Save Preset
+                </Button>
+                {dataPresets.length > 0 && (
+                  <PresetsList>
+                    {filteredPresets.map((entry, index) => (
+                      <PresetItem key={entry.timestamp}>
+                        <PresetItemHeader>
+                          {new Date(entry.timestamp).toLocaleDateString(
+                            "en-US",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric"
+                            }
+                          ) +
+                            " at " +
+                            new Date(entry.timestamp).toLocaleTimeString(
                               "en-US",
                               {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric"
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true
                               }
-                            ) +
-                              " at " +
-                              new Date(entry.timestamp).toLocaleTimeString(
-                                "en-US",
-                                {
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                  hour12: true
+                            )}
+                        </PresetItemHeader>
+                        {entry.data.screenshots &&
+                          entry.data.screenshots.length > 0 && (
+                            <AutoplayContainer>
+                              {entry.data.screenshots.map(
+                                (screenshot, index) => {
+                                  const isVisible =
+                                    autoplayStates[entry.data.id]
+                                      ?.currentIndex === index;
+                                  return (
+                                    <AutoplayImage
+                                      key={index}
+                                      src={screenshot.data}
+                                      alt={`Screenshot ${index + 1}`}
+                                      $isVisible={isVisible}
+                                    />
+                                  );
                                 }
                               )}
-                          </PresetItemHeader>
-                          {entry.data.screenshots &&
-                            entry.data.screenshots.length > 0 && (
-                              <AutoplayContainer>
-                                {entry.data.screenshots.map(
-                                  (screenshot, index) => {
-                                    const isVisible =
-                                      autoplayStates[entry.data.id]
-                                        ?.currentIndex === index;
-                                    return (
-                                      <AutoplayImage
-                                        key={index}
-                                        src={screenshot.data}
-                                        alt={`Screenshot ${index + 1}`}
-                                        $isVisible={isVisible}
-                                      />
-                                    );
-                                  }
-                                )}
-                              </AutoplayContainer>
-                            )}
-                          {entry.data.screenshots &&
-                            entry.data.screenshots.length < 6 && (
-                              <>
-                                <ProgressBar>
-                                  <ProgressFill
-                                    $progress={entry.data.screenshots.length}
-                                  />
-                                </ProgressBar>
-                              </>
-                            )}
-                          {entry.data.screenshots &&
-                            entry.data.screenshots.length >= 6 && (
-                              <>
-                                <Button
-                                  variant="primary"
-                                  fullWidth
-                                  onClick={() => sendSerialData(entry.data)}
-                                  disabled={!connected}
-                                >
-                                  Load
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  fullWidth
-                                  onClick={() =>
-                                    deletePresetItem(entry.data.id)
-                                  }
-                                >
-                                  Delete
-                                </Button>
-                              </>
-                            )}
-                        </PresetItem>
-                      ))}
-                    </PresetsList>
-                  )}
-                </AppPresetsContainer>
-              ) : (
-                <NoAppMessage>Open app to save preset</NoAppMessage>
-              )}
-            </>
-          )}
-        </ContentWrapper>
+                            </AutoplayContainer>
+                          )}
+                        {entry.data.screenshots &&
+                          entry.data.screenshots.length < 6 && (
+                            <>
+                              <ProgressBar>
+                                <ProgressFill
+                                  $progress={entry.data.screenshots.length}
+                                />
+                              </ProgressBar>
+                            </>
+                          )}
+                        {entry.data.screenshots &&
+                          entry.data.screenshots.length >= 6 && (
+                            <>
+                              <Button
+                                variant="primary"
+                                fullWidth
+                                onClick={() => sendSerialData(entry.data)}
+                                disabled={!connected}
+                              >
+                                Load
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                fullWidth
+                                onClick={() => deletePresetItem(entry.data.id)}
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                      </PresetItem>
+                    ))}
+                  </PresetsList>
+                )}
+              </AppPresetsContainer>
+            ) : (
+              <NoAppMessage>Open app to save preset</NoAppMessage>
+            )}
+          </>
+        )}
       </Page>
     </ThemeProvider>
   );
