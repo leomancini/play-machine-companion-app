@@ -469,6 +469,7 @@ function App() {
         setSerialData(data);
 
         if (data.action === "currentTheme") {
+          console.log("currentTheme", data);
           setCurrentTheme(data.data.theme);
           setHasReceivedTheme(true);
         }
