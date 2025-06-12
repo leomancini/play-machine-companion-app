@@ -145,6 +145,7 @@ function App() {
   const [hasReceivedTheme, setHasReceivedTheme] = useState(false);
   const [hasReceivedApp, setHasReceivedApp] = useState(false);
   const [cannotConnect, setCannotConnect] = useState(false);
+  const currentSocketId = useRef(null);
   const MAX_RETRIES = 5;
   const INITIAL_RETRY_DELAY = 1000;
   const socketRef = useRef(null);
@@ -156,6 +157,7 @@ function App() {
   const currentStateTimeoutRef = useRef(null);
   const MAX_API_KEY_LENGTH = 256;
   const API_KEY_REGEX = useMemo(() => /^[a-zA-Z0-9]+$/, []);
+  const recentThemeUpdates = useRef(new Set());
 
   // Get the current theme object based on the current theme data from API
   const currentThemeObject = useMemo(() => {
@@ -469,8 +471,37 @@ function App() {
         setSerialData(data);
 
         if (data.action === "currentTheme") {
-          console.log("currentTheme", data);
-          setCurrentTheme(data.data.theme);
+          const newTheme = data.data.theme;
+          const themeKey = `${newTheme}-${Date.now()}`;
+
+          // Add deduplication check to prevent duplicate theme updates
+          const recentThemeKey = `theme-${newTheme}`;
+
+          // Check if we've processed this theme very recently (within 1 second)
+          if (recentThemeUpdates.current.has(recentThemeKey)) {
+            console.log("currentTheme: duplicate theme update ignored", {
+              theme: newTheme,
+              currentTheme: currentTheme
+            });
+            return;
+          }
+
+          // Mark this theme as recently processed
+          recentThemeUpdates.current.add(recentThemeKey);
+
+          // Clear the tracking after 1 second
+          setTimeout(() => {
+            recentThemeUpdates.current.delete(recentThemeKey);
+          }, 1000);
+
+          console.log("currentTheme: processing theme update", {
+            newTheme,
+            currentTheme: currentTheme,
+            socketConnected: connected,
+            isProduction: process.env.NODE_ENV === "production"
+          });
+
+          setCurrentTheme(newTheme);
           setHasReceivedTheme(true);
         }
 
@@ -804,7 +835,23 @@ function App() {
     const ws = new WebSocket(WEBSOCKET_URL);
     socketRef.current = ws;
 
+    // Generate a unique connection ID for debugging
+    const connectionId = Math.random().toString(36).substring(7);
+    currentSocketId.current = connectionId;
+
+    console.log("WebSocket: attempting connection", {
+      connectionId,
+      url: WEBSOCKET_URL,
+      retryCount,
+      isProduction: process.env.NODE_ENV === "production"
+    });
+
     ws.onopen = () => {
+      console.log("WebSocket: connection opened", {
+        connectionId,
+        isProduction: process.env.NODE_ENV === "production"
+      });
+
       setConnected(true);
       setRetryCount(0);
       setSocket(ws);
@@ -812,6 +859,11 @@ function App() {
 
       // Fetch themes when WebSocket connects
       fetchThemes();
+
+      console.log("WebSocket: sending getCurrentTheme request", {
+        connectionId,
+        isProduction: process.env.NODE_ENV === "production"
+      });
 
       ws.send(
         JSON.stringify({
@@ -836,6 +888,13 @@ function App() {
     };
 
     ws.onclose = () => {
+      console.log("WebSocket: connection closed", {
+        connectionId,
+        retryCount,
+        willRetry: socketRef.current === ws && retryCount < MAX_RETRIES,
+        isProduction: process.env.NODE_ENV === "production"
+      });
+
       setConnected(false);
       setLoading(false);
       loadingRef.current = false;
@@ -843,6 +902,13 @@ function App() {
 
       if (socketRef.current === ws && retryCount < MAX_RETRIES) {
         const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+
+        console.log("WebSocket: scheduling reconnection", {
+          connectionId,
+          delay,
+          nextRetryCount: retryCount + 1,
+          isProduction: process.env.NODE_ENV === "production"
+        });
 
         setTimeout(() => {
           setRetryCount((prevCount) => prevCount + 1);
@@ -870,6 +936,7 @@ function App() {
     // Capture the current ref values to use in cleanup
     const currentUploadingScreenshots = uploadingScreenshots.current;
     const currentRecentPresetIds = recentPresetIds.current;
+    const currentRecentThemeUpdates = recentThemeUpdates.current;
 
     return () => {
       if (socketRef.current) {
@@ -882,6 +949,8 @@ function App() {
       loadingRef.current = false;
       // Clear recent preset tracking using the captured ref value
       currentRecentPresetIds.clear();
+      // Clear recent theme updates tracking using the captured ref value
+      currentRecentThemeUpdates.clear();
     };
   }, [connectWebSocket]);
 
